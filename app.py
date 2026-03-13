@@ -26,9 +26,9 @@ def load_chain():
     prompt = PromptTemplate(template=PROMPT_TEMPLATE, input_variables=["context", "question"])
     llm = ChatGroq(model="mixtral-8x7b-32768", api_key=st.secrets["GROQ_API_KEY"])
 
-def format_docs(docs):
-    text = "\n\n".join(doc.page_content for doc in docs)
-    return text[:2000]  # limit to 2000 characters
+    def format_docs(docs):
+        text = "\n\n".join(doc.page_content for doc in docs)
+        return text[:2000]
 
     chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
@@ -56,6 +56,6 @@ if query := st.chat_input("Ask a question..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             chain = load_chain()
-            answer = chain.invoke(query)
+            answer = chain.invoke({"question": query})
             st.write(answer)
     st.session_state.messages.append({"role": "assistant", "content": answer})
