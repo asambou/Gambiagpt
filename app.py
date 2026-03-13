@@ -31,12 +31,11 @@ def load_chain():
         return text[:2000]
 
     chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-    return chain
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
 
 st.set_page_config(page_title="GambiaGPT", page_icon="🇬🇲")
 st.title("🇬🇲 GambiaGPT")
@@ -56,6 +55,6 @@ if query := st.chat_input("Ask a question..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             chain = load_chain()
-            answer = chain.invoke({"question": query})
+            answer = chain.invoke(query)
             st.write(answer)
     st.session_state.messages.append({"role": "assistant", "content": answer})
