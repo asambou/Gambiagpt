@@ -24,10 +24,11 @@ def load_chain():
     db = FAISS.load_local(VECTOR_PATH, embeddings, allow_dangerous_deserialization=True)
     retriever = db.as_retriever(search_kwargs={"k": 2})
     prompt = PromptTemplate(template=PROMPT_TEMPLATE, input_variables=["context", "question"])
-    llm = ChatGroq(model="llama3-8b-8192", api_key=st.secrets["GROQ_API_KEY"])
+    llm = ChatGroq(model="mixtral-8x7b-32768", api_key=st.secrets["GROQ_API_KEY"])
 
-    def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
+def format_docs(docs):
+    text = "\n\n".join(doc.page_content for doc in docs)
+    return text[:2000]  # limit to 2000 characters
 
     chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
