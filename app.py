@@ -1,41 +1,32 @@
 import streamlit as st
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 from langchain_groq import ChatGroq
 
 VECTOR_PATH = "vectorstore"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-PROMPT_TEMPLATE = """Use the context below to answer the question in 2-3 sentences.
-If you don't know, say "I don't know."
-
-Context:
-{context}
-
-Question: {question}
-Answer:"""
-
 @st.cache_resource
-def load_chain():
+def load_retriever():
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
     db = FAISS.load_local(VECTOR_PATH, embeddings, allow_dangerous_deserialization=True)
-    retriever = db.as_retriever(search_kwargs={"k": 2})
-    prompt = PromptTemplate(template=PROMPT_TEMPLATE, input_variables=["context", "question"])
+    return db.as_retriever(search_kwargs={"k": 2})
+
+def get_answer(query):
+    retriever = load_retriever()
+    docs = retriever.invoke(query)
+    context = "\n\n".join(doc.page_content for doc in docs)[:2000]
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are GambiaGPT, an AI assistant for The Gambia. Use the context to answer. If you don't know, say so."),
+        ("human", f"Context:\n{context}\n\nQuestion: {query}")
+    ])
+
     llm = ChatGroq(model="mixtral-8x7b-32768", api_key=st.secrets["GROQ_API_KEY"])
-
-    def format_docs(docs):
-        text = "\n\n".join(doc.page_content for doc in docs)
-        return text[:2000]
-
-    chain = (
-    {"context": retriever | format_docs, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-    | StrOutputParser()
-)
+    chain = prompt | llm | StrOutputParser()
+    return chain.invoke({})
 
 st.set_page_config(page_title="GambiaGPT", page_icon="🇬🇲")
 st.title("🇬🇲 GambiaGPT")
@@ -54,7 +45,6 @@ if query := st.chat_input("Ask a question..."):
         st.write(query)
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            chain = load_chain()
-            answer = chain.invoke(query)
+            answer = get_answer(query)
             st.write(answer)
     st.session_state.messages.append({"role": "assistant", "content": answer})
