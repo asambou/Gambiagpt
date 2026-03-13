@@ -9,7 +9,7 @@ from langchain_groq import ChatGroq
 VECTOR_PATH = "vectorstore"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-PROMPT_TEMPLATE = """Use the following context to answer the question.
+PROMPT_TEMPLATE = """Use the context below to answer the question in 2-3 sentences.
 If you don't know, say "I don't know."
 
 Context:
@@ -22,7 +22,7 @@ Answer:"""
 def load_chain():
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
     db = FAISS.load_local(VECTOR_PATH, embeddings, allow_dangerous_deserialization=True)
-    retriever = db.as_retriever(search_kwargs={"k": 4})
+    retriever = db.as_retriever(search_kwargs={"k": 2})
     prompt = PromptTemplate(template=PROMPT_TEMPLATE, input_variables=["context", "question"])
     llm = ChatGroq(model="llama3-8b-8192", api_key=st.secrets["GROQ_API_KEY"])
 
