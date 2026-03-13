@@ -1,0 +1,8 @@
+langchain
+faiss-cpu
+streamlit
+ollama
+pypdf
+sentence-transformers
+requests
+beautifulsoup4
