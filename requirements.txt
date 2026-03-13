@@ -1,8 +1,12 @@
 langchain
+langchain-community
+langchain-groq
+langchain-core
+langchain-text-splitters
+langchain-huggingface
 faiss-cpu
-streamlit
-ollama
-pypdf
 sentence-transformers
-requests
+pypdf
+streamlit
 beautifulsoup4
+requests

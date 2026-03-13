@@ -1,0 +1,60 @@
+import streamlit as st
+from langchain_community.llms import Ollama
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+VECTOR_PATH = "vectorstore"
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+PROMPT_TEMPLATE = """Use the following context to answer the question.
+If you don't know, say "I don't know."
+
+Context:
+{context}
+
+Question: {question}
+Answer:"""
+
+@st.cache_resource
+def load_chain():
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    db = FAISS.load_local(VECTOR_PATH, embeddings, allow_dangerous_deserialization=True)
+    retriever = db.as_retriever(search_kwargs={"k": 4})
+    prompt = PromptTemplate(template=PROMPT_TEMPLATE, input_variables=["context", "question"])
+    llm = Ollama(model="llama3")
+
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    return chain
+
+st.title("🇬🇲 GambiaGPT")
+st.write("Ask anything about The Gambia!")
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+if query := st.chat_input("Ask a question..."):
+    st.session_state.messages.append({"role": "user", "content": query})
+    with st.chat_message("user"):
+        st.write(query)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            chain = load_chain()
+            answer = chain.invoke(query)
+            st.write(answer)
+    st.session_state.messages.append({"role": "assistant", "content": answer})
