@@ -20,7 +20,7 @@ def get_answer(query):
         docs = retriever.invoke(query)
         context = "\n\n".join(doc.page_content for doc in docs)[:500]
 
-        llm = ChatGroq(model="llama3-8b-8192", api_key=st.secrets["GROQ_API_KEY"])
+        llm = ChatGroq(model="llama-3.1-8b-instant", api_key=st.secrets["GROQ_API_KEY"])
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", "You are GambiaGPT. Answer briefly using the context."),
