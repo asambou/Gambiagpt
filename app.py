@@ -17,7 +17,7 @@ def load_retriever():
 def get_answer(query):
     retriever = load_retriever()
     docs = retriever.invoke(query)
-    context = "\n\n".join(doc.page_content for doc in docs)[:2000]
+    context = "\n\n".join(doc.page_content for doc in docs)[:800]
 
     llm = ChatGroq(model="mixtral-8x7b-32768", api_key=st.secrets["GROQ_API_KEY"])
 
