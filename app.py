@@ -15,10 +15,22 @@ def load_retriever():
     return db.as_retriever(search_kwargs={"k": 2})
 
 def get_answer(query):
-    retriever = load_retriever()
-    docs = retriever.invoke(query)
-    context = "\n\n".join(doc.page_content for doc in docs)[:800]
+    try:
+        retriever = load_retriever()
+        docs = retriever.invoke(query)
+        context = "\n\n".join(doc.page_content for doc in docs)[:500]
 
+        llm = ChatGroq(model="llama3-8b-8192", api_key=st.secrets["GROQ_API_KEY"])
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are GambiaGPT. Answer briefly using the context."),
+            ("human", "Context:\n{context}\n\nQuestion: {question}")
+        ])
+
+        chain = prompt | llm | StrOutputParser()
+        return chain.invoke({"context": context, "question": query})
+    except Exception as e:
+        return f"DEBUG ERROR: {str(e)}"
     llm = ChatGroq(model="mixtral-8x7b-32768", api_key=st.secrets["GROQ_API_KEY"])
 
     prompt = ChatPromptTemplate.from_messages([
