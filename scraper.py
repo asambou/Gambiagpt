@@ -16,6 +16,9 @@ TARGETS = [
     {"url": "https://www.moe.gov.gm", "name": "ministry_education"},
     {"url": "https://www.mofa.gov.gm", "name": "ministry_foreign_affairs"},
     {"url": "https://www.grts.gm", "name": "grts_tv"},
+    {"url": "https://whatson-gambia.com", "name": "whatson_gambia"},
+    {"url": "https://www.kerrfatou.com", "name": "kerr_fatou"},
+    {"url": "https://fatunetwork.net", "name": "fatu_network"},
 
     # News
     {"url": "https://thepoint.gm", "name": "thepoint"},

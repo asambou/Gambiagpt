@@ -219,7 +219,7 @@ with st.sidebar:
                             st.error(msg)
 
 # --- TABS ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Ask GambiaGPT", "🔐 Cybersecurity Lab", "🌐 Networking Lab", "🗺️ Gambia Map", "📞 Emergency Contacts"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["💬 Ask GambiaGPT", "🔐 Cybersecurity Lab", "🌐 Networking Lab", "🗺️ Gambia Map", "📞 Emergency Contacts", "📰 News Digest"])
 # ── TAB 1: CHAT ──
 with tab1:
     st.info("💬 Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
@@ -614,3 +614,153 @@ with tab5:
     """)
 
     st.caption("📌 Always verify contact numbers locally as they may change. In emergency always call 117 or 116.")
+    # ── TAB 6: NEWS DIGEST ──
+with tab6:
+    st.subheader("📰 Daily Gambia News Digest")
+    st.caption("Latest news from Gambian media — updated on demand.")
+
+    news_sources = {
+    "The Point Newspaper": "https://thepoint.gm",
+    "Foroyaa Newspaper": "https://foroyaa.net",
+    "Gainako": "https://gainako.com",
+    "The Standard": "https://thestandard.gm",
+    "SMBC News": "https://smbcnewsgambia.com",
+    "WhatsOn Gambia": "https://whatson-gambia.com",
+    "Kerr Fatou": "https://www.kerrfatou.com",
+    "Fatu Network": "https://fatunetwork.net",
+}
+
+    selected_source = st.selectbox("Choose news source:", list(news_sources.keys()))
+
+    col1, col2 = st.columns(2)
+    with col1:
+        news_category = st.selectbox("Category:", [
+            "Latest news",
+            "Politics & Government",
+            "Business & Economy",
+            "Health",
+            "Education",
+            "Sports",
+            "Technology",
+            "Tourism",
+        ])
+    with col2:
+        num_stories = st.slider("Number of stories:", min_value=3, max_value=10, value=5)
+
+    if st.button("Fetch latest news", type="primary"):
+        with st.spinner(f"Fetching {news_category} from {selected_source}..."):
+            try:
+                tavily = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
+                query = f"Gambia {news_category} latest news 2025 site:{news_sources[selected_source]}"
+                results = tavily.search(
+                    query=query,
+                    max_results=num_stories,
+                    search_depth="advanced"
+                )
+
+                if results.get("results"):
+                    st.success(f"Found {len(results['results'])} stories from {selected_source}")
+                    for i, article in enumerate(results["results"], 1):
+                        with st.expander(f"📰 {i}. {article.get('title', 'No title')}"):
+                            st.write(article.get("content", "No content available")[:500] + "...")
+                            if article.get("url"):
+                                st.markdown(f"[Read full article]({article['url']})")
+                else:
+                    st.warning("No stories found. Try a different source or category.")
+            except Exception as e:
+                st.error(f"Could not fetch news. Error: {str(e)}")
+
+    st.divider()
+
+    # AI News Summary
+    st.subheader("🤖 AI News Briefing")
+    st.write("Get an AI-generated summary of what is happening in Gambia right now.")
+
+    briefing_topic = st.text_input(
+        "Topic for briefing:",
+        placeholder="e.g. Gambia economy, Gambia politics, Gambia health..."
+    )
+
+    if st.button("Generate briefing", type="primary", key="briefing_btn"):
+        if briefing_topic:
+            with st.spinner("Researching and writing briefing..."):
+                try:
+                    tavily = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
+                    results = tavily.search(
+                        query=f"Gambia {briefing_topic} latest news 2025",
+                        max_results=5,
+                        search_depth="advanced"
+                    )
+                    web_context = "\n\n".join([
+                        r.get("content", "") for r in results.get("results", [])
+                    ])[:3000]
+
+                    llm = ChatGroq(
+                        model="llama-3.3-70b-versatile",
+                        api_key=st.secrets["GROQ_API_KEY"],
+                        temperature=0.3
+                    )
+
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", """You are a professional Gambian news journalist.
+Write a clear, balanced, and informative news briefing based on the provided context.
+Format it with a headline, a summary paragraph, and 3-5 key points.
+Be factual and neutral. Write in a professional journalistic style."""),
+                        ("human", f"Write a news briefing about: {briefing_topic}\n\nContext:\n{web_context}")
+                    ])
+
+                    chain = prompt | llm | StrOutputParser()
+                    briefing = chain.invoke({})
+                    st.markdown(briefing)
+
+                except Exception as e:
+                    st.error(f"Could not generate briefing. Error: {str(e)}")
+        else:
+            st.warning("Please enter a topic first.")
+
+    st.divider()
+
+    # Quick news topics
+    st.subheader("⚡ Quick News Topics")
+    st.write("Click any topic for an instant AI briefing:")
+
+    quick_topics = [
+        "Gambia economy 2025",
+        "Gambia politics latest",
+        "Adama Barrow government",
+        "Gambia health news",
+        "Gambia education news",
+        "Gambia tourism 2025",
+        "Gambia football news",
+        "Gambia agriculture",
+        "Gambia technology startups",
+        "River Gambia environment",
+    ]
+
+    cols = st.columns(2)
+    for i, topic in enumerate(quick_topics):
+        with cols[i % 2]:
+            if st.button(f"📰 {topic}", key=f"quick_{i}"):
+                with st.spinner(f"Researching {topic}..."):
+                    answer = get_answer(f"Give me the latest news and updates about: {topic}")
+                    st.markdown(answer)
+
+    st.divider()
+
+    # Gambia media directory
+    st.subheader("📡 Gambian Media Directory")
+    st.markdown("""
+| Media | Type | Website | Facebook |
+|-------|------|---------|----------|
+| The Point | Newspaper | [thepoint.gm](https://thepoint.gm) | facebook.com/thepointgambia |
+| Foroyaa | Newspaper | [foroyaa.net](https://foroyaa.net) | facebook.com/foroyaa |
+| The Standard | Newspaper | [thestandard.gm](https://thestandard.gm) | facebook.com/standardnewspaper |
+| Gainako | Online News | [gainako.com](https://gainako.com) | facebook.com/gainako |
+| WhatsOn Gambia | Entertainment | [whatson-gambia.com](https://whatson-gambia.com) | facebook.com/whatson.gambia |
+| Kerr Fatou | News & Politics | [kerrfatou.com](https://www.kerrfatou.com) | facebook.com/kerrfatou |
+| Fatu Network | News & Talk Shows | [fatunetwork.net](https://fatunetwork.net) | facebook.com/fatunetwork |
+| GRTS | TV & Radio | [grts.gm](https://grts.gm) | facebook.com/grtsgambia |
+| Taranga FM | Radio | [tarangafm.com](https://tarangafm.com) | facebook.com/tarangafm |
+| West Coast Radio | Radio | [westcoastradio.gm](https://westcoastradio.gm) | facebook.com/westcoastradio |
+| SMBC News | Online | [smbcnewsgambia.com](https://smbcnewsgambia.com) | facebook.com/smbcnews |
+""")
