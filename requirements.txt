@@ -11,3 +11,5 @@ pypdf
 beautifulsoup4
 requests
 tavily-python
+supabase
+bcrypt
