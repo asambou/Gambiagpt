@@ -83,10 +83,3 @@ if query := st.chat_input("Jaarama / Salaam / Hello / Ask me anything..."):
             answer = get_answer(query)
             st.write(answer)
     st.session_state.messages.append({"role": "assistant", "content": answer})
-```
-
-**Step 5 — Add `TAVILY_API_KEY` to Streamlit secrets:**
-Go to your app settings on Streamlit and update secrets to:
-```
-GROQ_API_KEY = "your-groq-key"
-TAVILY_API_KEY = "your-tavily-key"
