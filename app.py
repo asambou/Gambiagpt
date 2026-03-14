@@ -654,8 +654,7 @@ elif page == "📞 Emergency":
 # ════════════════════════════════════════
 # ── PAGE: LEGAL & LAW ──
 # ════════════════════════════════════════
-elif 
-page == "⚖️ Legal & Law":
+elif page == "⚖️ Legal & Law":
     st.title("⚖️ Legal & Law Guide — The Gambia")
     st.caption("Know your rights as a Gambian citizen.")
 
