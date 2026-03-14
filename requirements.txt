@@ -10,3 +10,4 @@ sentence-transformers
 pypdf
 beautifulsoup4
 requests
+tavily-python
