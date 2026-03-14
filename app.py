@@ -219,8 +219,7 @@ with st.sidebar:
                             st.error(msg)
 
 # --- TABS ---
-tab1, tab2, tab3, tab4 = st.tabs(["💬 Ask GambiaGPT", "🔐 Cybersecurity Lab", "🌐 Networking Lab", "🗺️ Gambia Map"])
-
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Ask GambiaGPT", "🔐 Cybersecurity Lab", "🌐 Networking Lab", "🗺️ Gambia Map", "📞 Emergency Contacts"])
 # ── TAB 1: CHAT ──
 with tab1:
     st.info("💬 Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
@@ -510,3 +509,108 @@ with tab4:
     col_d.metric("Hotels", len(hotels))
 
     st.caption("Click any marker on the map to see details. Use the filter above to show different categories.")
+    # ── TAB 5: EMERGENCY CONTACTS ──
+with tab5:
+    st.subheader("📞 Emergency Contacts — The Gambia")
+    st.error("🚨 If this is a life-threatening emergency call 117 or 116 immediately.")
+
+    st.divider()
+
+    # Emergency services
+    st.subheader("🚨 Emergency Services")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Police Emergency", "117")
+        st.metric("Fire Service", "118")
+    with col2:
+        st.metric("Ambulance", "116")
+        st.metric("Tourist Police", "+220 446 2566")
+    with col3:
+        st.metric("Coast Guard", "+220 422 8657")
+        st.metric("Immigration", "+220 422 8631")
+
+    st.divider()
+
+    # Hospitals
+    st.subheader("🏥 Major Hospitals")
+    hospitals = [
+        {"name": "Royal Victoria Teaching Hospital", "phone": "+220 422 8223", "location": "Banjul", "notes": "Main national hospital"},
+        {"name": "Serekunda General Hospital", "phone": "+220 439 0765", "location": "Serekunda", "notes": "Largest hospital outside Banjul"},
+        {"name": "Bansang Hospital", "phone": "+220 566 1234", "location": "Bansang, CRR", "notes": "Central River Region"},
+        {"name": "Farafenni Hospital", "phone": "+220 573 1234", "location": "Farafenni, NBR", "notes": "North Bank Region"},
+        {"name": "MRC Gambia", "phone": "+220 449 5442", "location": "Fajara", "notes": "Medical Research Centre"},
+        {"name": "Kanifing Hospital", "phone": "+220 439 2620", "location": "Kanifing", "notes": "KMC area hospital"},
+    ]
+    for h in hospitals:
+        with st.expander(f"🏥 {h['name']} — {h['location']}"):
+            col_a, col_b = st.columns(2)
+            col_a.write(f"📞 **Phone:** {h['phone']}")
+            col_b.write(f"📍 **Location:** {h['location']}")
+            st.write(f"ℹ️ {h['notes']}")
+
+    st.divider()
+
+    # Government
+    st.subheader("🏛️ Government Contacts")
+    gov_contacts = [
+        {"name": "State House", "phone": "+220 422 2745", "dept": "Office of the President"},
+        {"name": "Ministry of Health", "phone": "+220 422 8428", "dept": "Health Services"},
+        {"name": "Ministry of Education", "phone": "+220 422 8833", "dept": "Education"},
+        {"name": "Ministry of Justice", "phone": "+220 422 8181", "dept": "Legal Affairs"},
+        {"name": "Ministry of Finance", "phone": "+220 422 7571", "dept": "Finance"},
+        {"name": "Ministry of Foreign Affairs", "phone": "+220 422 9400", "dept": "Foreign Affairs"},
+        {"name": "Gambia Revenue Authority", "phone": "+220 422 7144", "dept": "Taxes & Revenue"},
+        {"name": "NAWEC", "phone": "+220 422 5544", "dept": "Water & Electricity"},
+        {"name": "Gambia Ports Authority", "phone": "+220 422 7266", "dept": "Ports & Shipping"},
+    ]
+    for g in gov_contacts:
+        col_a, col_b, col_c = st.columns(3)
+        col_a.write(f"**{g['name']}**")
+        col_b.write(g['phone'])
+        col_c.write(g['dept'])
+
+    st.divider()
+
+    # Embassies
+    st.subheader("🌍 Embassies & High Commissions in Banjul")
+    embassies = [
+        {"country": "United States", "phone": "+220 439 2856", "address": "Kairaba Avenue, Fajara"},
+        {"country": "United Kingdom", "phone": "+220 449 5133", "address": "48 Atlantic Road, Fajara"},
+        {"country": "Senegal", "phone": "+220 422 7469", "address": "10 Nelson Mandela Street, Banjul"},
+        {"country": "China", "phone": "+220 422 8839", "address": "Kairaba Avenue, Fajara"},
+        {"country": "European Union", "phone": "+220 449 5018", "address": "48 Kairaba Avenue"},
+        {"country": "Nigeria", "phone": "+220 422 8483", "address": "31 Liberation Avenue, Banjul"},
+        {"country": "Ghana", "phone": "+220 422 7870", "address": "2 Clarkson Street, Banjul"},
+        {"country": "Sierra Leone", "phone": "+220 422 9250", "address": "67 Hagan Street, Banjul"},
+    ]
+    for e in embassies:
+        with st.expander(f"🌍 {e['country']}"):
+            st.write(f"📞 **Phone:** {e['phone']}")
+            st.write(f"📍 **Address:** {e['address']}")
+
+    st.divider()
+
+    # Telecom operators
+    st.subheader("📱 Telecom Operators")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.info("**Africell**\nCustomer care: 111\nWebsite: africell.gm")
+    with col2:
+        st.info("**Gamcel**\nCustomer care: 123\nWebsite: gamcel.gm")
+    with col3:
+        st.info("**QCell**\nCustomer care: 199\nWebsite: qcell.gm")
+
+    st.divider()
+
+    # Useful links
+    st.subheader("🔗 Useful Links")
+    st.markdown("""
+- [Gambia Government Portal](https://www.gov.gm)
+- [Gambia Tourism Board](https://www.visitthegambia.gm)
+- [NAWEC — Power & Water](https://www.nawec.gm)
+- [Gambia Revenue Authority](https://www.gra.gm)
+- [University of The Gambia](https://www.utm.edu.gm)
+- [Gambia Police Force](https://www.gambiapolice.gm)
+    """)
+
+    st.caption("📌 Always verify contact numbers locally as they may change. In emergency always call 117 or 116.")
