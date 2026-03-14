@@ -1,8 +1,9 @@
+import streamlit as st
+import requests
+import feedparser
+import ipaddress
 import folium
 from streamlit_folium import st_folium
-import streamlit as st
-import bcrypt
-import ipaddress
 from supabase import create_client
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -10,6 +11,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
 from tavily import TavilyClient
+import bcrypt
 
 VECTOR_PATH = "vectorstore"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -43,6 +45,7 @@ ANSWER STYLE:
 - Always encourage Gambian youth in tech careers.
 """
 
+# ── HELPERS ──
 @st.cache_resource
 def get_supabase():
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
@@ -68,12 +71,8 @@ def get_answer(query):
         docs = retriever.invoke(query)
         doc_context = "\n\n".join(doc.page_content for doc in docs)[:600]
         web_context = web_search(query)
-        combined_context = f"WEB SEARCH RESULTS:\n{web_context}\n\nDOCUMENT KNOWLEDGE BASE:\n{doc_context}"
-        llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            api_key=st.secrets["GROQ_API_KEY"],
-            temperature=0.3
-        )
+        combined_context = f"WEB:\n{web_context}\n\nDOCS:\n{doc_context}"
+        llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=st.secrets["GROQ_API_KEY"], temperature=0.3)
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
             ("human", "Context:\n{context}\n\nQuestion: {question}")
@@ -97,9 +96,9 @@ def register_user(email, password):
             return False, "Email already registered."
         hashed = hash_password(password)
         supabase.table("users").insert({"email": email, "password_hash": hashed}).execute()
-        return True, "Account created successfully!"
+        return True, "Account created!"
     except Exception as e:
-        return False, f"Error: {str(e)}"
+        return False, str(e)
 
 def login_user(email, password):
     try:
@@ -112,36 +111,24 @@ def login_user(email, password):
             return True, user, "Login successful!"
         return False, None, "Wrong password."
     except Exception as e:
-        return False, None, f"Error: {str(e)}"
+        return False, None, str(e)
 
 def save_message(user_id, role, content):
     try:
-        supabase = get_supabase()
-        supabase.table("chat_history").insert({
-            "user_id": user_id,
-            "role": role,
-            "content": content
-        }).execute()
+        get_supabase().table("chat_history").insert({"user_id": user_id, "role": role, "content": content}).execute()
     except:
         pass
 
 def load_history(user_id):
     try:
-        supabase = get_supabase()
-        result = supabase.table("chat_history")\
-            .select("*")\
-            .eq("user_id", user_id)\
-            .order("created_at")\
-            .limit(50)\
-            .execute()
+        result = get_supabase().table("chat_history").select("*").eq("user_id", user_id).order("created_at").limit(50).execute()
         return result.data or []
     except:
         return []
 
 def clear_history(user_id):
     try:
-        supabase = get_supabase()
-        supabase.table("chat_history").delete().eq("user_id", user_id).execute()
+        get_supabase().table("chat_history").delete().eq("user_id", user_id).execute()
     except:
         pass
 
@@ -162,27 +149,42 @@ def subnet_calculator(ip, prefix):
     except:
         return None
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="GambiaGPT", page_icon="🇬🇲", layout="centered")
-st.title("🇬🇲 GambiaGPT")
-st.caption("Your AI guide to The Gambia — and your cybersecurity tutor")
+# ── PAGE CONFIG ──
+st.set_page_config(page_title="GambiaGPT", page_icon="🇬🇲", layout="wide")
 
-# --- AUTH STATE ---
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# --- SIDEBAR: LOGIN / REGISTER ---
+# ── SIDEBAR ──
 with st.sidebar:
+    st.image("https://upload.wikimedia.org/wikipedia/commons/7/77/Flag_of_The_Gambia.svg", width=80)
+    st.title("🇬🇲 GambiaGPT")
+    st.caption("Your AI guide to The Gambia")
+    st.divider()
+
+    page = st.radio("Navigate:", [
+        "💬 Chat",
+        "📰 News",
+        "🗺️ Map",
+        "🎓 Education",
+        "🔐 Cybersecurity",
+        "🌐 Networking",
+        "📞 Emergency",
+        "💰 Exchange Rates",
+    ])
+
+    st.divider()
     st.header("👤 Account")
+
+    if "user" not in st.session_state:
+        st.session_state.user = None
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
     if st.session_state.user:
-        st.success(f"Logged in as:\n{st.session_state.user['email']}")
-        if st.button("Load my chat history"):
+        st.success(f"✅ {st.session_state.user['email']}")
+        if st.button("Load history"):
             history = load_history(st.session_state.user["id"])
             st.session_state.messages = [{"role": h["role"], "content": h["content"]} for h in history]
             st.rerun()
-        if st.button("Clear chat history"):
+        if st.button("Clear history"):
             clear_history(st.session_state.user["id"])
             st.session_state.messages = []
             st.rerun()
@@ -210,29 +212,31 @@ with st.sidebar:
             if st.button("Create account", type="primary"):
                 if email and password:
                     if len(password) < 6:
-                        st.error("Password must be at least 6 characters.")
+                        st.error("Password must be 6+ characters.")
                     else:
                         success, msg = register_user(email, password)
-                        if success:
-                            st.success(msg)
-                        else:
-                            st.error(msg)
+                        st.success(msg) if success else st.error(msg)
 
-# --- TABS ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["💬 Ask GambiaGPT", "🔐 Cybersecurity Lab", "🌐 Networking Lab", "🗺️ Gambia Map", "📞 Emergency Contacts", "📰 News Digest"])
-# ── TAB 1: CHAT ──
-with tab1:
-    st.info("💬 Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
+    st.divider()
+    st.caption("Built for Gambia 🇬🇲 | Free to use")
+
+# ════════════════════════════════════════
+# ── PAGE: CHAT ──
+# ════════════════════════════════════════
+if page == "💬 Chat":
+    st.title("💬 Ask GambiaGPT")
+    st.info("Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
+
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if query := st.chat_input("Ask anything about Gambia or cybersecurity..."):
+    if query := st.chat_input("Ask anything about Gambia, cybersecurity, or networking..."):
         st.session_state.messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
             st.markdown(query)
         with st.chat_message("assistant"):
-            with st.spinner("Searching and thinking..."):
+            with st.spinner("Thinking..."):
                 answer = get_answer(query)
                 st.markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
@@ -240,527 +244,411 @@ with tab1:
             save_message(st.session_state.user["id"], "user", query)
             save_message(st.session_state.user["id"], "assistant", answer)
 
-# ── TAB 2: CYBERSECURITY LAB ──
-with tab2:
-    st.subheader("🔐 Cybersecurity Learning Lab")
-    topic = st.selectbox("Choose a topic to study:", [
-        "Pick a topic...",
-        "CEH — Certified Ethical Hacker overview",
-        "CompTIA Security+ study guide",
-        "Kali Linux top 10 tools",
-        "How to do a penetration test",
-        "Types of cyberattacks explained",
-        "Firewalls and how they work",
-        "VPN explained",
-        "Password attacks explained",
-        "Social engineering and phishing",
-        "How to start a cybersecurity career in Gambia",
-        "CTF — Capture The Flag beginner guide",
-        "Python for cybersecurity automation",
-        "OWASP Top 10 web vulnerabilities",
-        "Network scanning with Nmap",
-        "Wireshark packet analysis basics",
-    ])
-    if topic != "Pick a topic...":
-        if st.button("Learn this topic", type="primary"):
-            with st.spinner(f"Loading {topic}..."):
-                answer = get_answer(f"Teach me about: {topic}. Give a detailed explanation with examples, commands, and practical tips.")
-                st.markdown(answer)
-    st.divider()
-    cyber_q = st.text_input("Ask any cybersecurity question:")
-    if st.button("Ask tutor", key="cyber_btn"):
-        if cyber_q:
-            with st.spinner("Thinking..."):
-                st.markdown(get_answer(f"As a cybersecurity expert: {cyber_q}"))
-    st.divider()
-    st.subheader("🎯 Cybersecurity Roadmap for Gambians")
-    st.markdown("""
-**Beginner:** CompTIA ITF+ → A+ → Network+ → Security+
-
-**Intermediate:** CEH → eJPT → OSCP
-
-**Free resources:**
-- [TryHackMe](https://tryhackme.com) — best for beginners
-- [HackTheBox](https://hackthebox.com) — intermediate labs
-- [Cybrary](https://cybrary.it) — free courses
-- [Professor Messer](https://professormesser.com) — CompTIA videos
-    """)
-
-# ── TAB 3: NETWORKING LAB ──
-with tab3:
-    st.subheader("🌐 Networking & Routing Lab")
-    net_topic = st.selectbox("Choose a networking topic:", [
-        "Pick a topic...",
-        "OSI model — all 7 layers explained",
-        "TCP/IP model vs OSI model",
-        "How routing works — step by step",
-        "OSPF configuration on Cisco routers",
-        "BGP — Border Gateway Protocol explained",
-        "EIGRP configuration guide",
-        "VLANs — setup and trunking",
-        "Spanning Tree Protocol STP explained",
-        "NAT and PAT — how they work",
-        "DHCP — how IP addresses are assigned",
-        "DNS — how domain names resolve",
-        "Access Control Lists ACLs on Cisco",
-        "How switches work — MAC address table",
-        "IPv6 subnetting and configuration",
-        "GRE tunnels and VPN configuration",
-        "CCNA exam study guide",
-    ])
-    if net_topic != "Pick a topic...":
-        if st.button("Learn this topic", type="primary", key="net_btn"):
-            with st.spinner(f"Loading {net_topic}..."):
-                answer = get_answer(f"As a CCNA instructor, teach me: {net_topic}. Include Cisco IOS commands and real configs.")
-                st.markdown(answer)
-    st.divider()
-    st.subheader("🧮 Subnet Calculator")
-    col1, col2 = st.columns(2)
-    with col1:
-        ip_input = st.text_input("IP Address", value="192.168.1.0")
-    with col2:
-        prefix_input = st.slider("Prefix length", min_value=8, max_value=30, value=24)
-    if st.button("Calculate subnet", type="primary"):
-        result = subnet_calculator(ip_input, prefix_input)
-        if result:
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.metric("Network address", result["network"])
-                st.metric("Subnet mask", result["netmask"])
-                st.metric("First host", result["first_host"])
-                st.metric("IP class", result["ip_class"])
-            with col_b:
-                st.metric("Broadcast address", result["broadcast"])
-                st.metric("Wildcard mask", result["wildcard"])
-                st.metric("Last host", result["last_host"])
-                st.metric("Usable hosts", f"{result['hosts']:,}")
-        else:
-            st.error("Invalid IP address. Please check and try again.")
-    st.divider()
-    st.subheader("💻 Cisco IOS Quick Reference")
-    st.markdown("""
-| Task | Command |
-|------|---------|
-| Enter privileged mode | `enable` |
-| Enter config mode | `configure terminal` |
-| Set hostname | `hostname R1` |
-| Show IP interfaces | `show ip interface brief` |
-| Show routing table | `show ip route` |
-| Configure interface | `interface gi0/0` |
-| Set IP address | `ip address 192.168.1.1 255.255.255.0` |
-| Enable interface | `no shutdown` |
-| Save config | `write memory` |
-| Configure OSPF | `router ospf 1` |
-| Set OSPF network | `network 192.168.1.0 0.0.0.255 area 0` |
-| Configure VLAN | `vlan 10` |
-| Set trunk port | `switchport mode trunk` |
-    """)
-    net_q = st.text_input("Ask any networking question:")
-    if st.button("Ask engineer", key="net_ask_btn"):
-        if net_q:
-            with st.spinner("Consulting the network engineer..."):
-                st.markdown(get_answer(f"As a senior network engineer: {net_q}. Include commands and configs."))
-                # ── TAB 4: INTERACTIVE MAP ──
-with tab4:
-    st.subheader("🗺️ Interactive Map of The Gambia")
-    st.caption("Explore tourist spots, hospitals, universities and more.")
-
-    # Filter options
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        map_filter = st.multiselect(
-            "Show on map:",
-            ["Tourist spots", "Hospitals", "Universities", "Hotels", "Markets", "Embassies"],
-            default=["Tourist spots"]
-        )
-    with col2:
-        map_style = st.selectbox("Map style:", ["OpenStreetMap", "CartoDB positron", "CartoDB dark_matter"])
-
-    # Create base map centered on Gambia
-    m = folium.Map(
-        location=[13.4549, -15.3100],
-        zoom_start=8,
-        tiles=map_style
-    )
-
-    # --- TOURIST SPOTS ---
-    tourist_spots = [
-        {"name": "Kachikally Crocodile Pool", "lat": 13.4441, "lon": -16.6774, "desc": "Sacred crocodile pool in Bakau. One of Gambia's most visited attractions.", "region": "West Coast"},
-        {"name": "Abuko Nature Reserve", "lat": 13.3833, "lon": -16.6500, "desc": "Gambia's first nature reserve. Home to monkeys, birds, and reptiles.", "region": "West Coast"},
-        {"name": "Janjanbureh Island", "lat": 13.5500, "lon": -14.7667, "desc": "Historic island town. Former colonial capital, rich in history.", "region": "Central River"},
-        {"name": "Wassu Stone Circles", "lat": 13.6833, "lon": -14.9167, "desc": "UNESCO World Heritage Site. Ancient stone circles dating back 1,000 years.", "region": "Central River"},
-        {"name": "River Gambia National Park", "lat": 13.5833, "lon": -14.9000, "desc": "Home to chimpanzees and hippos along the River Gambia.", "region": "Central River"},
-        {"name": "Bijilo Forest Park", "lat": 13.4167, "lon": -16.7167, "desc": "Coastal forest park with green vervet monkeys and diverse birdlife.", "region": "West Coast"},
-        {"name": "Tanji Bird Reserve", "lat": 13.3667, "lon": -16.7167, "desc": "Important bird watching site on the Atlantic coast.", "region": "West Coast"},
-        {"name": "Kartong Beach", "lat": 13.0833, "lon": -16.7500, "desc": "Unspoiled beach at the southern tip of Gambia. Peaceful and scenic.", "region": "West Coast"},
-        {"name": "Banjul Albert Market", "lat": 13.4531, "lon": -16.5731, "desc": "Gambia's biggest market. Everything from fabrics to spices and crafts.", "region": "Banjul"},
-        {"name": "Arch 22", "lat": 13.4533, "lon": -16.5756, "desc": "Iconic monument in Banjul. Great views of the city from the top.", "region": "Banjul"},
-        {"name": "Serrekunda Market", "lat": 13.4386, "lon": -16.6775, "desc": "Largest market in Gambia. Vibrant and full of local culture.", "region": "West Coast"},
-        {"name": "James Island", "lat": 13.4833, "lon": -16.5333, "desc": "UNESCO World Heritage Site. Former slave trade fort in the River Gambia.", "region": "West Coast"},
-    ]
-
-    # --- HOSPITALS ---
-    hospitals = [
-        {"name": "Royal Victoria Teaching Hospital", "lat": 13.4544, "lon": -16.5786, "desc": "Gambia's main national hospital in Banjul. Largest medical facility.", "region": "Banjul"},
-        {"name": "Edward Francis Small Teaching Hospital", "lat": 13.4544, "lon": -16.5786, "desc": "Main referral hospital serving greater Banjul area.", "region": "Banjul"},
-        {"name": "Serekunda General Hospital", "lat": 13.4386, "lon": -16.6775, "desc": "Major hospital serving the greater Serekunda area.", "region": "West Coast"},
-        {"name": "Bansang Hospital", "lat": 13.4667, "lon": -14.6500, "desc": "Main hospital for Central River Region.", "region": "Central River"},
-        {"name": "Farafenni Hospital", "lat": 13.5667, "lon": -15.6000, "desc": "Main hospital for North Bank Region.", "region": "North Bank"},
-        {"name": "Kanifing Hospital", "lat": 13.4500, "lon": -16.6667, "desc": "Hospital serving Kanifing Municipal area.", "region": "West Coast"},
-        {"name": "MRC Gambia", "lat": 13.4167, "lon": -16.6667, "desc": "Medical Research Council — world-class research hospital.", "region": "West Coast"},
-    ]
-
-    # --- UNIVERSITIES ---
-    universities = [
-        {"name": "University of The Gambia", "lat": 13.4167, "lon": -16.6500, "desc": "Gambia's national university. Offers degrees in medicine, law, engineering and more.", "region": "West Coast"},
-        {"name": "GTTI — Gambia Technical Training Institute", "lat": 13.4500, "lon": -16.6500, "desc": "Technical and vocational training institute.", "region": "West Coast"},
-        {"name": "Gambia College", "lat": 13.3833, "lon": -16.6833, "desc": "Teacher training and nursing college.", "region": "West Coast"},
-        {"name": "American International University", "lat": 13.4500, "lon": -16.6400, "desc": "Private international university in Kanifing.", "region": "West Coast"},
-        {"name": "Management Development Institute", "lat": 13.4400, "lon": -16.6600, "desc": "Business and management studies institute.", "region": "West Coast"},
-    ]
-
-    # --- HOTELS ---
-    hotels = [
-        {"name": "Coco Ocean Resort", "lat": 13.4167, "lon": -16.7333, "desc": "5-star luxury resort on the Atlantic coast.", "region": "West Coast"},
-        {"name": "Sunset Beach Hotel", "lat": 13.4167, "lon": -16.7167, "desc": "Popular beachfront hotel in Kololi.", "region": "West Coast"},
-        {"name": "Kairaba Beach Hotel", "lat": 13.4167, "lon": -16.7200, "desc": "One of Gambia's top beach hotels.", "region": "West Coast"},
-        {"name": "Laico Atlantic Hotel", "lat": 13.4533, "lon": -16.5867, "desc": "Business hotel in central Banjul.", "region": "Banjul"},
-        {"name": "Ngala Lodge", "lat": 13.4833, "lon": -16.6833, "desc": "Boutique eco-lodge in Bakau.", "region": "West Coast"},
-        {"name": "Mandina Lodges", "lat": 13.5000, "lon": -15.8000, "desc": "Stunning eco-lodge on the River Gambia.", "region": "Central River"},
-    ]
-
-    # --- MARKETS ---
-    markets = [
-        {"name": "Albert Market Banjul", "lat": 13.4531, "lon": -16.5731, "desc": "Gambia's oldest and most famous market.", "region": "Banjul"},
-        {"name": "Serrekunda Market", "lat": 13.4386, "lon": -16.6775, "desc": "Largest market in Gambia.", "region": "West Coast"},
-        {"name": "Brikama Market", "lat": 13.2667, "lon": -16.6500, "desc": "Known for wood carvings and crafts.", "region": "West Coast"},
-        {"name": "Tanji Fish Market", "lat": 13.3667, "lon": -16.7167, "desc": "Busy fishing village market on the coast.", "region": "West Coast"},
-        {"name": "Bakau Market", "lat": 13.4667, "lon": -16.6833, "desc": "Local market in Bakau town.", "region": "West Coast"},
-    ]
-
-    # --- EMBASSIES ---
-    embassies = [
-        {"name": "US Embassy Banjul", "lat": 13.4533, "lon": -16.5800, "desc": "United States Embassy in Banjul.", "region": "Banjul"},
-        {"name": "UK High Commission", "lat": 13.4500, "lon": -16.5750, "desc": "British High Commission in Banjul.", "region": "Banjul"},
-        {"name": "EU Delegation Gambia", "lat": 13.4520, "lon": -16.5780, "desc": "European Union Delegation in Banjul.", "region": "Banjul"},
-        {"name": "Senegal Embassy", "lat": 13.4510, "lon": -16.5760, "desc": "Embassy of Senegal in Banjul.", "region": "Banjul"},
-        {"name": "China Embassy", "lat": 13.4490, "lon": -16.5790, "desc": "Embassy of China in Banjul.", "region": "Banjul"},
-    ]
-
-    # Color and icon mapping
-    category_config = {
-        "Tourist spots": {"data": tourist_spots, "color": "green", "icon": "star"},
-        "Hospitals": {"data": hospitals, "color": "red", "icon": "plus"},
-        "Universities": {"data": universities, "color": "blue", "icon": "graduation-cap"},
-        "Hotels": {"data": hotels, "color": "purple", "icon": "home"},
-        "Markets": {"data": markets, "color": "orange", "icon": "shopping-cart"},
-        "Embassies": {"data": embassies, "color": "darkblue", "icon": "flag"},
+# ════════════════════════════════════════
+# ── PAGE: NEWS ──
+# ════════════════════════════════════════
+elif page == "📰 News":
+    st.title("📰 Gambia News Digest")
+    news_sources = {
+        "The Point": "https://thepoint.gm",
+        "Foroyaa": "https://foroyaa.net",
+        "Gainako": "https://gainako.com",
+        "The Standard": "https://thestandard.gm",
+        "WhatsOn Gambia": "https://whatson-gambia.com",
+        "Kerr Fatou": "https://www.kerrfatou.com",
+        "Fatu Network": "https://fatunetwork.net",
+        "SMBC News": "https://smbcnewsgambia.com",
     }
 
-    # Add markers for selected categories
-    for category in map_filter:
-        if category in category_config:
-            config = category_config[category]
-            for place in config["data"]:
-                folium.Marker(
-                    location=[place["lat"], place["lon"]],
-                    popup=folium.Popup(
-                        f"<b>{place['name']}</b><br>{place['desc']}<br><i>{place['region']}</i>",
-                        max_width=250
-                    ),
-                    tooltip=place["name"],
-                    icon=folium.Icon(
-                        color=config["color"],
-                        icon=config["icon"],
-                        prefix="fa"
-                    )
-                ).add_to(m)
-
-    # Add river Gambia line
-    folium.PolyLine(
-        locations=[
-            [13.4667, -16.5833],
-            [13.4833, -16.3000],
-            [13.5000, -15.8000],
-            [13.5500, -15.3000],
-            [13.5500, -14.9000],
-            [13.5500, -14.6500],
-        ],
-        color="blue",
-        weight=3,
-        opacity=0.6,
-        tooltip="River Gambia"
-    ).add_to(m)
-
-    # Display map
-    map_data = st_folium(m, width=700, height=500)
-
-    # Show clicked location info
-    if map_data["last_object_clicked_popup"]:
-        st.info(f"Selected: {map_data['last_object_clicked_popup']}")
-
-    st.divider()
-
-    # Stats
-    col_a, col_b, col_c, col_d = st.columns(4)
-    col_a.metric("Tourist spots", len(tourist_spots))
-    col_b.metric("Hospitals", len(hospitals))
-    col_c.metric("Universities", len(universities))
-    col_d.metric("Hotels", len(hotels))
-
-    st.caption("Click any marker on the map to see details. Use the filter above to show different categories.")
-    # ── TAB 5: EMERGENCY CONTACTS ──
-with tab5:
-    st.subheader("📞 Emergency Contacts — The Gambia")
-    st.error("🚨 If this is a life-threatening emergency call 117 or 116 immediately.")
-
-    st.divider()
-
-    # Emergency services
-    st.subheader("🚨 Emergency Services")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Police Emergency", "117")
-        st.metric("Fire Service", "118")
-    with col2:
-        st.metric("Ambulance", "116")
-        st.metric("Tourist Police", "+220 446 2566")
-    with col3:
-        st.metric("Coast Guard", "+220 422 8657")
-        st.metric("Immigration", "+220 422 8631")
-
-    st.divider()
-
-    # Hospitals
-    st.subheader("🏥 Major Hospitals")
-    hospitals = [
-        {"name": "Royal Victoria Teaching Hospital", "phone": "+220 422 8223", "location": "Banjul", "notes": "Main national hospital"},
-        {"name": "Serekunda General Hospital", "phone": "+220 439 0765", "location": "Serekunda", "notes": "Largest hospital outside Banjul"},
-        {"name": "Bansang Hospital", "phone": "+220 566 1234", "location": "Bansang, CRR", "notes": "Central River Region"},
-        {"name": "Farafenni Hospital", "phone": "+220 573 1234", "location": "Farafenni, NBR", "notes": "North Bank Region"},
-        {"name": "MRC Gambia", "phone": "+220 449 5442", "location": "Fajara", "notes": "Medical Research Centre"},
-        {"name": "Kanifing Hospital", "phone": "+220 439 2620", "location": "Kanifing", "notes": "KMC area hospital"},
-    ]
-    for h in hospitals:
-        with st.expander(f"🏥 {h['name']} — {h['location']}"):
-            col_a, col_b = st.columns(2)
-            col_a.write(f"📞 **Phone:** {h['phone']}")
-            col_b.write(f"📍 **Location:** {h['location']}")
-            st.write(f"ℹ️ {h['notes']}")
-
-    st.divider()
-
-    # Government
-    st.subheader("🏛️ Government Contacts")
-    gov_contacts = [
-        {"name": "State House", "phone": "+220 422 2745", "dept": "Office of the President"},
-        {"name": "Ministry of Health", "phone": "+220 422 8428", "dept": "Health Services"},
-        {"name": "Ministry of Education", "phone": "+220 422 8833", "dept": "Education"},
-        {"name": "Ministry of Justice", "phone": "+220 422 8181", "dept": "Legal Affairs"},
-        {"name": "Ministry of Finance", "phone": "+220 422 7571", "dept": "Finance"},
-        {"name": "Ministry of Foreign Affairs", "phone": "+220 422 9400", "dept": "Foreign Affairs"},
-        {"name": "Gambia Revenue Authority", "phone": "+220 422 7144", "dept": "Taxes & Revenue"},
-        {"name": "NAWEC", "phone": "+220 422 5544", "dept": "Water & Electricity"},
-        {"name": "Gambia Ports Authority", "phone": "+220 422 7266", "dept": "Ports & Shipping"},
-    ]
-    for g in gov_contacts:
-        col_a, col_b, col_c = st.columns(3)
-        col_a.write(f"**{g['name']}**")
-        col_b.write(g['phone'])
-        col_c.write(g['dept'])
-
-    st.divider()
-
-    # Embassies
-    st.subheader("🌍 Embassies & High Commissions in Banjul")
-    embassies = [
-        {"country": "United States", "phone": "+220 439 2856", "address": "Kairaba Avenue, Fajara"},
-        {"country": "United Kingdom", "phone": "+220 449 5133", "address": "48 Atlantic Road, Fajara"},
-        {"country": "Senegal", "phone": "+220 422 7469", "address": "10 Nelson Mandela Street, Banjul"},
-        {"country": "China", "phone": "+220 422 8839", "address": "Kairaba Avenue, Fajara"},
-        {"country": "European Union", "phone": "+220 449 5018", "address": "48 Kairaba Avenue"},
-        {"country": "Nigeria", "phone": "+220 422 8483", "address": "31 Liberation Avenue, Banjul"},
-        {"country": "Ghana", "phone": "+220 422 7870", "address": "2 Clarkson Street, Banjul"},
-        {"country": "Sierra Leone", "phone": "+220 422 9250", "address": "67 Hagan Street, Banjul"},
-    ]
-    for e in embassies:
-        with st.expander(f"🌍 {e['country']}"):
-            st.write(f"📞 **Phone:** {e['phone']}")
-            st.write(f"📍 **Address:** {e['address']}")
-
-    st.divider()
-
-    # Telecom operators
-    st.subheader("📱 Telecom Operators")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.info("**Africell**\nCustomer care: 111\nWebsite: africell.gm")
-    with col2:
-        st.info("**Gamcel**\nCustomer care: 123\nWebsite: gamcel.gm")
-    with col3:
-        st.info("**QCell**\nCustomer care: 199\nWebsite: qcell.gm")
-
-    st.divider()
-
-    # Useful links
-    st.subheader("🔗 Useful Links")
-    st.markdown("""
-- [Gambia Government Portal](https://www.gov.gm)
-- [Gambia Tourism Board](https://www.visitthegambia.gm)
-- [NAWEC — Power & Water](https://www.nawec.gm)
-- [Gambia Revenue Authority](https://www.gra.gm)
-- [University of The Gambia](https://www.utm.edu.gm)
-- [Gambia Police Force](https://www.gambiapolice.gm)
-    """)
-
-    st.caption("📌 Always verify contact numbers locally as they may change. In emergency always call 117 or 116.")
-    # ── TAB 6: NEWS DIGEST ──
-with tab6:
-    st.subheader("📰 Daily Gambia News Digest")
-    st.caption("Latest news from Gambian media — updated on demand.")
-
-    news_sources = {
-    "The Point Newspaper": "https://thepoint.gm",
-    "Foroyaa Newspaper": "https://foroyaa.net",
-    "Gainako": "https://gainako.com",
-    "The Standard": "https://thestandard.gm",
-    "SMBC News": "https://smbcnewsgambia.com",
-    "WhatsOn Gambia": "https://whatson-gambia.com",
-    "Kerr Fatou": "https://www.kerrfatou.com",
-    "Fatu Network": "https://fatunetwork.net",
-}
-
-    selected_source = st.selectbox("Choose news source:", list(news_sources.keys()))
-
     col1, col2 = st.columns(2)
     with col1:
-        news_category = st.selectbox("Category:", [
-            "Latest news",
-            "Politics & Government",
-            "Business & Economy",
-            "Health",
-            "Education",
-            "Sports",
-            "Technology",
-            "Tourism",
-        ])
+        selected_source = st.selectbox("Source:", list(news_sources.keys()))
+        category = st.selectbox("Category:", ["Latest news", "Politics", "Business", "Health", "Education", "Sports", "Technology"])
     with col2:
-        num_stories = st.slider("Number of stories:", min_value=3, max_value=10, value=5)
+        num_stories = st.slider("Stories:", 3, 10, 5)
+        briefing_topic = st.text_input("AI briefing topic:", placeholder="e.g. Gambia economy")
 
-    if st.button("Fetch latest news", type="primary"):
-        with st.spinner(f"Fetching {news_category} from {selected_source}..."):
-            try:
-                tavily = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-                query = f"Gambia {news_category} latest news 2025 site:{news_sources[selected_source]}"
-                results = tavily.search(
-                    query=query,
-                    max_results=num_stories,
-                    search_depth="advanced"
-                )
-
-                if results.get("results"):
-                    st.success(f"Found {len(results['results'])} stories from {selected_source}")
-                    for i, article in enumerate(results["results"], 1):
-                        with st.expander(f"📰 {i}. {article.get('title', 'No title')}"):
-                            st.write(article.get("content", "No content available")[:500] + "...")
-                            if article.get("url"):
-                                st.markdown(f"[Read full article]({article['url']})")
-                else:
-                    st.warning("No stories found. Try a different source or category.")
-            except Exception as e:
-                st.error(f"Could not fetch news. Error: {str(e)}")
-
-    st.divider()
-
-    # AI News Summary
-    st.subheader("🤖 AI News Briefing")
-    st.write("Get an AI-generated summary of what is happening in Gambia right now.")
-
-    briefing_topic = st.text_input(
-        "Topic for briefing:",
-        placeholder="e.g. Gambia economy, Gambia politics, Gambia health..."
-    )
-
-    if st.button("Generate briefing", type="primary", key="briefing_btn"):
-        if briefing_topic:
-            with st.spinner("Researching and writing briefing..."):
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("Fetch news", type="primary"):
+            with st.spinner("Fetching..."):
                 try:
                     tavily = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-                    results = tavily.search(
-                        query=f"Gambia {briefing_topic} latest news 2025",
-                        max_results=5,
-                        search_depth="advanced"
-                    )
-                    web_context = "\n\n".join([
-                        r.get("content", "") for r in results.get("results", [])
-                    ])[:3000]
-
-                    llm = ChatGroq(
-                        model="llama-3.3-70b-versatile",
-                        api_key=st.secrets["GROQ_API_KEY"],
-                        temperature=0.3
-                    )
-
-                    prompt = ChatPromptTemplate.from_messages([
-                        ("system", """You are a professional Gambian news journalist.
-Write a clear, balanced, and informative news briefing based on the provided context.
-Format it with a headline, a summary paragraph, and 3-5 key points.
-Be factual and neutral. Write in a professional journalistic style."""),
-                        ("human", f"Write a news briefing about: {briefing_topic}\n\nContext:\n{web_context}")
-                    ])
-
-                    chain = prompt | llm | StrOutputParser()
-                    briefing = chain.invoke({})
-                    st.markdown(briefing)
-
+                    results = tavily.search(query=f"Gambia {category} {news_sources[selected_source]}", max_results=num_stories)
+                    for i, article in enumerate(results.get("results", []), 1):
+                        with st.expander(f"📰 {i}. {article.get('title', 'No title')}"):
+                            st.write(article.get("content", "")[:400] + "...")
+                            if article.get("url"):
+                                st.markdown(f"[Read more]({article['url']})")
                 except Exception as e:
-                    st.error(f"Could not generate briefing. Error: {str(e)}")
-        else:
-            st.warning("Please enter a topic first.")
-
-    st.divider()
-
-    # Quick news topics
-    st.subheader("⚡ Quick News Topics")
-    st.write("Click any topic for an instant AI briefing:")
-
-    quick_topics = [
-        "Gambia economy 2025",
-        "Gambia politics latest",
-        "Adama Barrow government",
-        "Gambia health news",
-        "Gambia education news",
-        "Gambia tourism 2025",
-        "Gambia football news",
-        "Gambia agriculture",
-        "Gambia technology startups",
-        "River Gambia environment",
-    ]
-
-    cols = st.columns(2)
-    for i, topic in enumerate(quick_topics):
-        with cols[i % 2]:
-            if st.button(f"📰 {topic}", key=f"quick_{i}"):
-                with st.spinner(f"Researching {topic}..."):
-                    answer = get_answer(f"Give me the latest news and updates about: {topic}")
+                    st.error(str(e))
+    with col_b:
+        if st.button("Generate AI briefing", type="primary"):
+            if briefing_topic:
+                with st.spinner("Writing briefing..."):
+                    answer = get_answer(f"Write a professional news briefing about: {briefing_topic} in Gambia. Include latest developments, key facts, and analysis.")
                     st.markdown(answer)
 
     st.divider()
+    st.subheader("⚡ Quick topics")
+    quick_topics = ["Gambia economy", "Adama Barrow", "Gambia health", "Gambia education", "Gambia football", "Gambia tourism"]
+    cols = st.columns(3)
+    for i, topic in enumerate(quick_topics):
+        with cols[i % 3]:
+            if st.button(f"📰 {topic}", key=f"news_{i}"):
+                with st.spinner("Loading..."):
+                    st.markdown(get_answer(f"Latest news about: {topic}"))
 
-    # Gambia media directory
-    st.subheader("📡 Gambian Media Directory")
+    st.divider()
+    st.subheader("📡 Gambian Media")
     st.markdown("""
-| Media | Type | Website | Facebook |
-|-------|------|---------|----------|
-| The Point | Newspaper | [thepoint.gm](https://thepoint.gm) | facebook.com/thepointgambia |
-| Foroyaa | Newspaper | [foroyaa.net](https://foroyaa.net) | facebook.com/foroyaa |
-| The Standard | Newspaper | [thestandard.gm](https://thestandard.gm) | facebook.com/standardnewspaper |
-| Gainako | Online News | [gainako.com](https://gainako.com) | facebook.com/gainako |
-| WhatsOn Gambia | Entertainment | [whatson-gambia.com](https://whatson-gambia.com) | facebook.com/whatson.gambia |
-| Kerr Fatou | News & Politics | [kerrfatou.com](https://www.kerrfatou.com) | facebook.com/kerrfatou |
-| Fatu Network | News & Talk Shows | [fatunetwork.net](https://fatunetwork.net) | facebook.com/fatunetwork |
-| GRTS | TV & Radio | [grts.gm](https://grts.gm) | facebook.com/grtsgambia |
-| Taranga FM | Radio | [tarangafm.com](https://tarangafm.com) | facebook.com/tarangafm |
-| West Coast Radio | Radio | [westcoastradio.gm](https://westcoastradio.gm) | facebook.com/westcoastradio |
-| SMBC News | Online | [smbcnewsgambia.com](https://smbcnewsgambia.com) | facebook.com/smbcnews |
-""")
+| Media | Website | Facebook |
+|-------|---------|----------|
+| The Point | [thepoint.gm](https://thepoint.gm) | facebook.com/thepointgambia |
+| Foroyaa | [foroyaa.net](https://foroyaa.net) | facebook.com/foroyaa |
+| WhatsOn Gambia | [whatson-gambia.com](https://whatson-gambia.com) | facebook.com/whatson.gambia |
+| Kerr Fatou | [kerrfatou.com](https://www.kerrfatou.com) | facebook.com/kerrfatou |
+| Fatu Network | [fatunetwork.net](https://fatunetwork.net) | facebook.com/fatunetwork |
+| GRTS | [grts.gm](https://grts.gm) | facebook.com/grtsgambia |
+    """)
+
+# ════════════════════════════════════════
+# ── PAGE: MAP ──
+# ════════════════════════════════════════
+elif page == "🗺️ Map":
+    st.title("🗺️ Interactive Map of The Gambia")
+    map_filter = st.multiselect("Show:", ["Tourist spots", "Hospitals", "Universities", "Hotels", "Markets", "Embassies"], default=["Tourist spots"])
+    map_style = st.selectbox("Style:", ["OpenStreetMap", "CartoDB positron", "CartoDB dark_matter"])
+
+    m = folium.Map(location=[13.4549, -15.3100], zoom_start=8, tiles=map_style)
+
+    all_places = {
+        "Tourist spots": [
+            {"name": "Kachikally Crocodile Pool", "lat": 13.4441, "lon": -16.6774, "desc": "Sacred crocodile pool in Bakau."},
+            {"name": "Abuko Nature Reserve", "lat": 13.3833, "lon": -16.6500, "desc": "Gambia's first nature reserve."},
+            {"name": "Wassu Stone Circles", "lat": 13.6833, "lon": -14.9167, "desc": "UNESCO World Heritage Site."},
+            {"name": "Arch 22", "lat": 13.4533, "lon": -16.5756, "desc": "Iconic monument in Banjul."},
+            {"name": "James Island", "lat": 13.4833, "lon": -16.5333, "desc": "UNESCO World Heritage Site."},
+            {"name": "Bijilo Forest Park", "lat": 13.4167, "lon": -16.7167, "desc": "Coastal forest with monkeys."},
+        ],
+        "Hospitals": [
+            {"name": "Royal Victoria Teaching Hospital", "lat": 13.4544, "lon": -16.5786, "desc": "Main national hospital."},
+            {"name": "Serekunda General Hospital", "lat": 13.4386, "lon": -16.6775, "desc": "Largest outside Banjul."},
+            {"name": "MRC Gambia", "lat": 13.4167, "lon": -16.6667, "desc": "Medical Research Council."},
+        ],
+        "Universities": [
+            {"name": "University of The Gambia", "lat": 13.4167, "lon": -16.6500, "desc": "National university."},
+            {"name": "GTTI", "lat": 13.4500, "lon": -16.6500, "desc": "Technical training institute."},
+            {"name": "Gambia College", "lat": 13.3833, "lon": -16.6833, "desc": "Teacher and nursing training."},
+        ],
+        "Hotels": [
+            {"name": "Coco Ocean Resort", "lat": 13.4167, "lon": -16.7333, "desc": "5-star luxury resort."},
+            {"name": "Kairaba Beach Hotel", "lat": 13.4167, "lon": -16.7200, "desc": "Top beach hotel."},
+            {"name": "Mandina Lodges", "lat": 13.5000, "lon": -15.8000, "desc": "Eco-lodge on the river."},
+        ],
+        "Markets": [
+            {"name": "Albert Market Banjul", "lat": 13.4531, "lon": -16.5731, "desc": "Oldest famous market."},
+            {"name": "Serrekunda Market", "lat": 13.4386, "lon": -16.6775, "desc": "Largest market in Gambia."},
+            {"name": "Brikama Market", "lat": 13.2667, "lon": -16.6500, "desc": "Known for wood carvings."},
+        ],
+        "Embassies": [
+            {"name": "US Embassy", "lat": 13.4533, "lon": -16.5800, "desc": "United States Embassy."},
+            {"name": "UK High Commission", "lat": 13.4500, "lon": -16.5750, "desc": "British High Commission."},
+        ],
+    }
+
+    colors = {"Tourist spots": "green", "Hospitals": "red", "Universities": "blue", "Hotels": "purple", "Markets": "orange", "Embassies": "darkblue"}
+    icons = {"Tourist spots": "star", "Hospitals": "plus", "Universities": "graduation-cap", "Hotels": "home", "Markets": "shopping-cart", "Embassies": "flag"}
+
+    for category in map_filter:
+        if category in all_places:
+            for place in all_places[category]:
+                folium.Marker(
+                    location=[place["lat"], place["lon"]],
+                    popup=folium.Popup(f"<b>{place['name']}</b><br>{place['desc']}", max_width=250),
+                    tooltip=place["name"],
+                    icon=folium.Icon(color=colors[category], icon=icons[category], prefix="fa")
+                ).add_to(m)
+
+    folium.PolyLine(
+        locations=[[13.4667, -16.5833], [13.5000, -15.8000], [13.5500, -14.9000], [13.5500, -14.6500]],
+        color="blue", weight=3, opacity=0.6, tooltip="River Gambia"
+    ).add_to(m)
+
+    st_folium(m, width=900, height=500)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Tourist spots", 6)
+    col2.metric("Hospitals", 3)
+    col3.metric("Universities", 3)
+    col4.metric("Hotels", 3)
+
+# ════════════════════════════════════════
+# ── PAGE: EDUCATION ──
+# ════════════════════════════════════════
+elif page == "🎓 Education":
+    st.title("🎓 University & Education Guide")
+
+    edu_section = st.radio("Section:", ["Universities", "Admission", "Scholarships", "AI Advisor"], horizontal=True)
+
+    if edu_section == "Universities":
+        st.subheader("Universities & Colleges")
+        for uni in [
+            {"name": "University of The Gambia (UTG)", "type": "Public", "phone": "+220 441 2200", "fee": "GMD 15,000-45,000/yr", "web": "utm.edu.gm"},
+            {"name": "Gambia College", "type": "Public", "phone": "+220 441 2345", "fee": "GMD 10,000-25,000/yr", "web": "gambiacollege.edu.gm"},
+            {"name": "GTTI", "type": "Public", "phone": "+220 439 1234", "fee": "GMD 8,000-20,000/yr", "web": "gtti.edu.gm"},
+            {"name": "AIUWA", "type": "Private", "phone": "+220 439 5678", "fee": "GMD 30,000-60,000/yr", "web": "aiuwa.com"},
+            {"name": "MDI", "type": "Public", "phone": "+220 439 7890", "fee": "GMD 12,000-30,000/yr", "web": "mdi.edu.gm"},
+        ]:
+            with st.expander(f"🏛️ {uni['name']} — {uni['type']}"):
+                col_a, col_b = st.columns(2)
+                col_a.write(f"📞 {uni['phone']}")
+                col_a.write(f"💰 {uni['fee']}")
+                col_b.markdown(f"🌐 [{uni['web']}](https://{uni['web']})")
+
+    elif edu_section == "Admission":
+        st.subheader("Admission Requirements")
+        uni = st.selectbox("University:", ["UTG", "Gambia College", "GTTI", "AIUWA", "MDI"])
+        program = st.selectbox("Program:", ["General", "Medicine", "Engineering", "Law", "Business", "Education", "Nursing", "ICT"])
+        if st.button("Get requirements", type="primary"):
+            with st.spinner("Loading..."):
+                st.markdown(get_answer(f"Admission requirements for {program} at {uni} Gambia. Include WASSCE grades and documents needed."))
+        st.divider()
+        st.markdown("""
+**Documents typically needed:**
+- WASSCE results
+- Birth certificate
+- National ID or passport
+- 2 passport photos
+- Recommendation letter
+- Application fee receipt
+        """)
+
+    elif edu_section == "Scholarships":
+        st.subheader("Scholarships for Gambian Students")
+        for s in [
+            {"name": "Gambia Government Scholarship", "coverage": "Full tuition + stipend", "deadline": "August", "link": "moherst.gov.gm"},
+            {"name": "Commonwealth Scholarship", "coverage": "Full + flights + allowance", "deadline": "October-December", "link": "cscuk.fcdo.gov.uk"},
+            {"name": "Mastercard Foundation", "coverage": "Full + accommodation + laptop", "deadline": "Varies", "link": "mastercardfdn.org"},
+            {"name": "Turkiye Burslari", "coverage": "Full + flights + stipend", "deadline": "February", "link": "turkiyeburslari.gov.tr"},
+            {"name": "Chinese Government (CSC)", "coverage": "Full + accommodation + stipend", "deadline": "March-April", "link": "csc.edu.cn"},
+            {"name": "Islamic Development Bank", "coverage": "Tuition + living allowance", "deadline": "January", "link": "isdb.org"},
+        ]:
+            with st.expander(f"🏆 {s['name']}"):
+                col_a, col_b = st.columns(2)
+                col_a.write(f"💰 {s['coverage']}")
+                col_b.write(f"📅 Deadline: {s['deadline']}")
+                st.markdown(f"🌐 [Apply here](https://{s['link']})")
+
+    elif edu_section == "AI Advisor":
+        st.subheader("AI Education Advisor")
+        for q in ["Best university in Gambia for medicine?", "How to apply for government scholarship?", "How to study abroad for free from Gambia?"]:
+            if st.button(f"❓ {q}", key=q):
+                with st.spinner("Advising..."):
+                    st.markdown(get_answer(q))
+        custom_q = st.text_area("Your question:")
+        if st.button("Ask advisor", type="primary"):
+            if custom_q:
+                with st.spinner("Advising..."):
+                    st.markdown(get_answer(f"As a Gambian education advisor: {custom_q}"))
+
+# ════════════════════════════════════════
+# ── PAGE: CYBERSECURITY ──
+# ════════════════════════════════════════
+elif page == "🔐 Cybersecurity":
+    st.title("🔐 Cybersecurity Lab")
+    topic = st.selectbox("Choose topic:", [
+        "Pick a topic...", "CEH overview", "CompTIA Security+", "Kali Linux top 10 tools",
+        "How to do a penetration test", "Types of cyberattacks", "Firewalls explained",
+        "VPN explained", "Password attacks", "Social engineering and phishing",
+        "Cybersecurity career in Gambia", "CTF beginner guide", "Python for security",
+        "OWASP Top 10", "Nmap scanning", "Wireshark basics",
+    ])
+    if topic != "Pick a topic...":
+        if st.button("Learn", type="primary"):
+            with st.spinner("Loading..."):
+                st.markdown(get_answer(f"Teach me about: {topic}. Give detailed explanation with examples and commands."))
+    st.divider()
+    q = st.text_input("Ask any cybersecurity question:")
+    if st.button("Ask", key="cyber"):
+        if q:
+            with st.spinner("Thinking..."):
+                st.markdown(get_answer(f"As cybersecurity expert: {q}"))
+    st.divider()
+    st.subheader("🎯 Roadmap")
+    st.markdown("""
+**Beginner:** ITF+ → A+ → Network+ → Security+
+
+**Intermediate:** CEH → eJPT → OSCP
+
+**Free resources:** [TryHackMe](https://tryhackme.com) | [HackTheBox](https://hackthebox.com) | [Cybrary](https://cybrary.it)
+    """)
+
+# ════════════════════════════════════════
+# ── PAGE: NETWORKING ──
+# ════════════════════════════════════════
+elif page == "🌐 Networking":
+    st.title("🌐 Networking Lab")
+    net_section = st.radio("Section:", ["Study topics", "Subnet calculator", "Cisco IOS reference", "Ask engineer"], horizontal=True)
+
+    if net_section == "Study topics":
+        topic = st.selectbox("Choose topic:", [
+            "Pick a topic...", "OSI model 7 layers", "TCP/IP vs OSI",
+            "How routing works", "OSPF configuration", "BGP explained",
+            "VLANs and trunking", "STP explained", "NAT and PAT",
+            "DHCP explained", "DNS explained", "ACLs on Cisco",
+            "How switches work", "IPv6 subnetting", "CCNA study guide",
+        ])
+        if topic != "Pick a topic...":
+            if st.button("Learn", type="primary"):
+                with st.spinner("Loading..."):
+                    st.markdown(get_answer(f"CCNA instructor teaching: {topic}. Include Cisco commands and configs."))
+
+    elif net_section == "Subnet calculator":
+        col1, col2 = st.columns(2)
+        with col1:
+            ip = st.text_input("IP Address", "192.168.1.0")
+        with col2:
+            prefix = st.slider("Prefix", 8, 30, 24)
+        if st.button("Calculate", type="primary"):
+            r = subnet_calculator(ip, prefix)
+            if r:
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.metric("Network", r["network"])
+                    st.metric("Subnet mask", r["netmask"])
+                    st.metric("First host", r["first_host"])
+                    st.metric("Class", r["ip_class"])
+                with col_b:
+                    st.metric("Broadcast", r["broadcast"])
+                    st.metric("Wildcard", r["wildcard"])
+                    st.metric("Last host", r["last_host"])
+                    st.metric("Usable hosts", f"{r['hosts']:,}")
+            else:
+                st.error("Invalid IP address.")
+
+    elif net_section == "Cisco IOS reference":
+        st.markdown("""
+| Task | Command |
+|------|---------|
+| Privileged mode | `enable` |
+| Config mode | `configure terminal` |
+| Set hostname | `hostname R1` |
+| Show interfaces | `show ip interface brief` |
+| Show routes | `show ip route` |
+| Configure interface | `interface gi0/0` |
+| Set IP | `ip address 192.168.1.1 255.255.255.0` |
+| Enable interface | `no shutdown` |
+| Save config | `write memory` |
+| Configure OSPF | `router ospf 1` |
+| OSPF network | `network 192.168.1.0 0.0.0.255 area 0` |
+| Create VLAN | `vlan 10` |
+| Trunk port | `switchport mode trunk` |
+        """)
+
+    elif net_section == "Ask engineer":
+        q = st.text_input("Ask any networking question:")
+        if st.button("Ask", key="net"):
+            if q:
+                with st.spinner("Consulting..."):
+                    st.markdown(get_answer(f"Senior network engineer: {q}. Include commands and configs."))
+
+# ════════════════════════════════════════
+# ── PAGE: EMERGENCY ──
+# ════════════════════════════════════════
+elif page == "📞 Emergency":
+    st.title("📞 Emergency Contacts")
+    st.error("🚨 Life-threatening emergency — call 117 or 116 immediately.")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Police", "117")
+    col1.metric("Fire", "118")
+    col2.metric("Ambulance", "116")
+    col2.metric("Tourist Police", "+220 446 2566")
+    col3.metric("Coast Guard", "+220 422 8657")
+    col3.metric("Immigration", "+220 422 8631")
+
+    st.divider()
+    st.subheader("🏥 Hospitals")
+    for h in [
+        {"name": "Royal Victoria Teaching Hospital", "phone": "+220 422 8223", "area": "Banjul"},
+        {"name": "Serekunda General Hospital", "phone": "+220 439 0765", "area": "Serekunda"},
+        {"name": "MRC Gambia", "phone": "+220 449 5442", "area": "Fajara"},
+        {"name": "Bansang Hospital", "phone": "+220 566 1234", "area": "CRR"},
+        {"name": "Farafenni Hospital", "phone": "+220 573 1234", "area": "NBR"},
+    ]:
+        col_a, col_b, col_c = st.columns(3)
+        col_a.write(f"**{h['name']}**")
+        col_b.write(h["phone"])
+        col_c.write(h["area"])
+
+    st.divider()
+    st.subheader("📱 Telecom")
+    col1, col2, col3 = st.columns(3)
+    col1.info("**Africell**\n111")
+    col2.info("**Gamcel**\n123")
+    col3.info("**QCell**\n199")
+
+# ════════════════════════════════════════
+# ── PAGE: EXCHANGE RATES ──
+# ════════════════════════════════════════
+elif page == "💰 Exchange Rates":
+    st.title("💰 Exchange Rates — Gambian Dalasi")
+    st.caption("Rates update every hour.")
+
+    @st.cache_data(ttl=3600)
+    def get_rates():
+        try:
+            url = f"https://v6.exchangerate-api.com/v6/{st.secrets['EXCHANGE_API_KEY']}/latest/GMD"
+            data = requests.get(url, timeout=10).json()
+            if data["result"] == "success":
+                r = data["conversion_rates"]
+                return {k: round(1/r[k], 2) for k in ["USD", "GBP", "EUR", "XOF", "NGN", "CAD", "SEK"]}, r
+        except:
+            return None, None
+
+    rates, raw = get_rates()
+    if rates:
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("USD", f"D {rates['USD']}")
+        col2.metric("GBP", f"D {rates['GBP']}")
+        col3.metric("EUR", f"D {rates['EUR']}")
+        col4.metric("NGN", f"D {rates['NGN']}")
+        col5, col6, col7 = st.columns(3)
+        col5.metric("CAD", f"D {rates['CAD']}")
+        col6.metric("SEK", f"D {rates['SEK']}")
+        col7.metric("XOF", f"D {rates['XOF']}")
+
+        st.divider()
+        st.subheader("🔄 Converter")
+        currencies = ["USD", "GBP", "EUR", "NGN", "CAD", "SEK", "XOF"]
+        col_a, col_b, col_c = st.columns(3)
+        amount = col_a.number_input("Amount", value=100.0)
+        from_cur = col_b.selectbox("From", ["GMD"] + currencies)
+        to_cur = col_c.selectbox("To", currencies + ["GMD"])
+        if st.button("Convert", type="primary"):
+            try:
+                if from_cur == "GMD":
+                    result = amount * raw[to_cur]
+                    st.success(f"D {amount:,.2f} GMD = {result:,.2f} {to_cur}")
+                elif to_cur == "GMD":
+                    result = amount / raw[from_cur]
+                    st.success(f"{amount:,.2f} {from_cur} = D {result:,.2f} GMD")
+                else:
+                    result = (amount / raw[from_cur]) * raw[to_cur]
+                    st.success(f"{amount:,.2f} {from_cur} = {result:,.2f} {to_cur}")
+            except:
+                st.error("Conversion failed.")
+    else:
+        st.warning("Could not fetch rates. Add EXCHANGE_API_KEY to secrets.")
+
+    st.divider()
+    st.subheader("🏦 Banks in Gambia")
+    for bank, web in [
+        ("Trust Bank Gambia", "trustbankgambia.com"),
+        ("GT Bank Gambia", "gtbank.com"),
+        ("Standard Chartered", "sc.com/gm"),
+        ("Ecobank Gambia", "ecobank.com"),
+        ("Access Bank Gambia", "accessbankplc.com"),
+    ]:
+        st.markdown(f"- **{bank}** — [{web}](https://{web})")
