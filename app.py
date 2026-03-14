@@ -167,7 +167,7 @@ with st.sidebar:
         "🔐 Cybersecurity",
         "🌐 Networking",
         "📞 Emergency",
-        "💰 Exchange Rates",
+        "⚖️ Legal & Law",
     ])
 
     st.divider()
@@ -590,65 +590,213 @@ elif page == "📞 Emergency":
     col3.info("**QCell**\n199")
 
 # ════════════════════════════════════════
-# ── PAGE: EXCHANGE RATES ──
+# ── PAGE: LEGAL & LAW ──
 # ════════════════════════════════════════
-elif page == "💰 Exchange Rates":
-    st.title("💰 Exchange Rates — Gambian Dalasi")
-    st.caption("Rates update every hour.")
+elif page == "⚖️ Legal & Law":
+    st.title("⚖️ Legal & Law Guide — The Gambia")
+    st.caption("Know your rights as a Gambian citizen.")
 
-    @st.cache_data(ttl=3600)
-    def get_rates():
-        try:
-            url = f"https://v6.exchangerate-api.com/v6/{st.secrets['EXCHANGE_API_KEY']}/latest/GMD"
-            data = requests.get(url, timeout=10).json()
-            if data["result"] == "success":
-                r = data["conversion_rates"]
-                return {k: round(1/r[k], 2) for k in ["USD", "GBP", "EUR", "XOF", "NGN", "CAD", "SEK"]}, r
-        except:
-            return None, None
+    legal_section = st.radio("Section:", [
+        "Constitution",
+        "Your Rights",
+        "Business Law",
+        "Family Law",
+        "Criminal Law",
+        "Land & Property",
+        "AI Legal Advisor",
+    ], horizontal=True)
 
-    rates, raw = get_rates()
-    if rates:
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("USD", f"D {rates['USD']}")
-        col2.metric("GBP", f"D {rates['GBP']}")
-        col3.metric("EUR", f"D {rates['EUR']}")
-        col4.metric("NGN", f"D {rates['NGN']}")
-        col5, col6, col7 = st.columns(3)
-        col5.metric("CAD", f"D {rates['CAD']}")
-        col6.metric("SEK", f"D {rates['SEK']}")
-        col7.metric("XOF", f"D {rates['XOF']}")
-
+    if legal_section == "Constitution":
+        st.subheader("📜 The Gambian Constitution")
+        st.info("The 1997 Constitution of the Republic of The Gambia is the supreme law of the land.")
+        topics = [
+            "What are the fundamental rights in the Gambia constitution?",
+            "What does the Gambia constitution say about freedom of speech?",
+            "What are the powers of the President of Gambia?",
+            "What does the Gambia constitution say about religion?",
+            "What are the rights of women in the Gambia constitution?",
+            "What does the Gambia constitution say about education?",
+            "What are the rights of children in Gambia?",
+            "How is the National Assembly structured in Gambia?",
+            "What does the Gambia constitution say about land ownership?",
+            "What are the rights of arrested persons in Gambia?",
+        ]
+        selected = st.selectbox("Choose a constitutional topic:", topics)
+        if st.button("Get explanation", type="primary"):
+            with st.spinner("Reading the constitution..."):
+                st.markdown(get_answer(f"Based on the 1997 Gambian Constitution explain: {selected}. Give clear detailed explanation with article references where possible."))
         st.divider()
-        st.subheader("🔄 Converter")
-        currencies = ["USD", "GBP", "EUR", "NGN", "CAD", "SEK", "XOF"]
-        col_a, col_b, col_c = st.columns(3)
-        amount = col_a.number_input("Amount", value=100.0)
-        from_cur = col_b.selectbox("From", ["GMD"] + currencies)
-        to_cur = col_c.selectbox("To", currencies + ["GMD"])
-        if st.button("Convert", type="primary"):
-            try:
-                if from_cur == "GMD":
-                    result = amount * raw[to_cur]
-                    st.success(f"D {amount:,.2f} GMD = {result:,.2f} {to_cur}")
-                elif to_cur == "GMD":
-                    result = amount / raw[from_cur]
-                    st.success(f"{amount:,.2f} {from_cur} = D {result:,.2f} GMD")
-                else:
-                    result = (amount / raw[from_cur]) * raw[to_cur]
-                    st.success(f"{amount:,.2f} {from_cur} = {result:,.2f} {to_cur}")
-            except:
-                st.error("Conversion failed.")
-    else:
-        st.warning("Could not fetch rates. Add EXCHANGE_API_KEY to secrets.")
+        custom_q = st.text_area("Ask your own constitutional question:")
+        if st.button("Ask", key="const_ask"):
+            if custom_q:
+                with st.spinner("Consulting the constitution..."):
+                    st.markdown(get_answer(f"Based on Gambian law and constitution: {custom_q}"))
 
-    st.divider()
-    st.subheader("🏦 Banks in Gambia")
-    for bank, web in [
-        ("Trust Bank Gambia", "trustbankgambia.com"),
-        ("GT Bank Gambia", "gtbank.com"),
-        ("Standard Chartered", "sc.com/gm"),
-        ("Ecobank Gambia", "ecobank.com"),
-        ("Access Bank Gambia", "accessbankplc.com"),
-    ]:
-        st.markdown(f"- **{bank}** — [{web}](https://{web})")
+    elif legal_section == "Your Rights":
+        st.subheader("🛡️ Know Your Rights in Gambia")
+        rights_topics = {
+            "Arrested by police": "What are my rights if I am arrested by police in Gambia?",
+            "At work": "What are my employment rights as a worker in Gambia?",
+            "As a tenant": "What are my rights as a tenant renting property in Gambia?",
+            "As a consumer": "What are my consumer rights in Gambia?",
+            "As a woman": "What are the legal rights of women in Gambia?",
+            "As a child": "What are the legal rights of children in Gambia?",
+            "Free speech": "What are my rights to freedom of speech in Gambia?",
+            "Right to education": "What is the right to education in Gambia?",
+            "Right to healthcare": "What is the right to healthcare in Gambia?",
+            "Voting rights": "What are the voting rights of Gambian citizens?",
+        }
+        col1, col2 = st.columns(2)
+        for i, (topic, query) in enumerate(rights_topics.items()):
+            with col1 if i % 2 == 0 else col2:
+                if st.button(f"🛡️ {topic}", key=f"rights_{i}"):
+                    with st.spinner("Loading..."):
+                        st.markdown(get_answer(query))
+
+    elif legal_section == "Business Law":
+        st.subheader("💼 Business Law in Gambia")
+        biz_topics = [
+            "How do I register a business in Gambia?",
+            "What taxes does a business pay in Gambia?",
+            "What is the Companies Act in Gambia?",
+            "How do I register an NGO in Gambia?",
+            "What are the employment laws for businesses in Gambia?",
+            "How do I protect my intellectual property in Gambia?",
+            "What are import and export regulations in Gambia?",
+            "How do I open a bank account for my business in Gambia?",
+            "What licenses do I need to start a restaurant in Gambia?",
+            "What are the investment laws for foreigners in Gambia?",
+        ]
+        selected_biz = st.selectbox("Business law topic:", biz_topics)
+        if st.button("Get legal guidance", type="primary"):
+            with st.spinner("Consulting business law..."):
+                st.markdown(get_answer(f"As a Gambian business lawyer: {selected_biz}. Give practical step by step guidance."))
+        st.divider()
+        st.subheader("📋 Business Registration Steps")
+        st.markdown("""
+**To register a business in Gambia:**
+1. Choose your business structure
+2. Choose a unique business name
+3. Register with **GRA** for TIN
+4. Register at **Registrar General's Department**
+5. Get operating license from local council
+6. Open a business bank account
+7. Register for VAT if turnover exceeds GMD 1 million
+
+**Key contacts:**
+- Registrar General: +220 422 8181
+- GRA: +220 422 7144
+- GIEPA: +220 437 0765
+        """)
+
+    elif legal_section == "Family Law":
+        st.subheader("👨‍👩‍👧 Family Law in Gambia")
+        family_topics = [
+            "How does marriage work legally in Gambia?",
+            "What are the divorce laws in Gambia?",
+            "What are child custody laws in Gambia?",
+            "How does inheritance work in Gambia?",
+            "What is the legal age of marriage in Gambia?",
+            "What are the rights of widows in Gambia?",
+            "How is child support determined in Gambia?",
+            "What is the law on domestic violence in Gambia?",
+            "How does adoption work in Gambia?",
+            "What are the rights of unmarried couples in Gambia?",
+        ]
+        selected_family = st.selectbox("Family law topic:", family_topics)
+        if st.button("Get legal guidance", type="primary", key="family_btn"):
+            with st.spinner("Consulting family law..."):
+                st.markdown(get_answer(f"As a Gambian family lawyer explain: {selected_family}"))
+
+    elif legal_section == "Criminal Law":
+        st.subheader("⚖️ Criminal Law in Gambia")
+        criminal_topics = [
+            "What are the most common criminal offences in Gambia?",
+            "What is the penalty for theft in Gambia?",
+            "What are drug laws in Gambia?",
+            "What is the legal process after arrest in Gambia?",
+            "What is the role of the Gambia Police Force?",
+            "What are cybercrime laws in Gambia?",
+            "What is the penalty for corruption in Gambia?",
+            "How does the court system work in Gambia?",
+            "What are traffic laws and penalties in Gambia?",
+        ]
+        selected_criminal = st.selectbox("Criminal law topic:", criminal_topics)
+        if st.button("Get legal guidance", type="primary", key="criminal_btn"):
+            with st.spinner("Consulting criminal law..."):
+                st.markdown(get_answer(f"As a Gambian criminal lawyer explain: {selected_criminal}"))
+        st.divider()
+        st.subheader("🏛️ Court System in Gambia")
+        st.markdown("""
+| Court | Jurisdiction |
+|-------|-------------|
+| Supreme Court | Highest court — constitutional matters |
+| Court of Appeal | Appeals from High Court |
+| High Court | Serious criminal and civil cases |
+| Magistrates Court | Minor criminal and civil cases |
+| Cadi Court | Islamic personal law matters |
+| District Tribunal | Local disputes and customary law |
+        """)
+
+    elif legal_section == "Land & Property":
+        st.subheader("🏠 Land & Property Law in Gambia")
+        land_topics = [
+            "How do I buy land in Gambia legally?",
+            "What is the State Lands Act in Gambia?",
+            "How do I get a land certificate in Gambia?",
+            "Can foreigners own land in Gambia?",
+            "What are tenant rights in Gambia?",
+            "How do I resolve a land dispute in Gambia?",
+            "What is the process for property inheritance in Gambia?",
+            "How do I verify land ownership in Gambia?",
+            "What are building regulations in Gambia?",
+            "How do I get planning permission in Gambia?",
+        ]
+        selected_land = st.selectbox("Land law topic:", land_topics)
+        if st.button("Get legal guidance", type="primary", key="land_btn"):
+            with st.spinner("Consulting property law..."):
+                st.markdown(get_answer(f"As a Gambian property lawyer explain: {selected_land}"))
+        st.divider()
+        st.subheader("📋 How to Buy Land in Gambia")
+        st.markdown("""
+**Step by step:**
+1. Find land and agree on price
+2. Verify ownership at **Department of Lands & Survey**
+3. Hire a registered lawyer
+4. Sign a sale agreement
+5. Pay stamp duty at GRA
+6. Register transfer at Department of Lands
+7. Get your land certificate
+
+**Key contact:**
+- Department of Lands & Survey: +220 422 8400
+        """)
+
+    elif legal_section == "AI Legal Advisor":
+        st.subheader("🤖 AI Legal Advisor")
+        st.warning("⚠️ General legal information only. For serious matters always consult a qualified Gambian lawyer.")
+        quick_legal = [
+            "Can my landlord evict me without notice?",
+            "What do I do if my employer does not pay me?",
+            "How do I report corruption in Gambia?",
+            "What happens if I am detained without charge?",
+            "How do I get legal aid in Gambia?",
+        ]
+        for q in quick_legal:
+            if st.button(f"⚖️ {q}", key=f"legal_{q}"):
+                with st.spinner("Consulting..."):
+                    st.markdown(get_answer(f"As a Gambian legal advisor: {q}"))
+        st.divider()
+        legal_q = st.text_area("Your legal question:")
+        if st.button("Ask legal advisor", type="primary"):
+            if legal_q:
+                with st.spinner("Consulting Gambian law..."):
+                    st.markdown(get_answer(f"As a Gambian legal advisor answer: {legal_q}. Give clear practical guidance and mention relevant laws."))
+        st.divider()
+        st.subheader("🏛️ Legal Aid in Gambia")
+        st.markdown("""
+- **Legal Aid Agency Gambia** — Free legal aid for those who cannot afford lawyers
+- **Gambia Bar Association** — +220 422 8181
+- **Women's Lawyers Association** — Legal help for women and children
+- **Institute for Human Rights and Development** — Human rights cases
+        """)
