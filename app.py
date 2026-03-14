@@ -1,3 +1,5 @@
+import folium
+from streamlit_folium import st_folium
 import streamlit as st
 import bcrypt
 import ipaddress
@@ -217,7 +219,7 @@ with st.sidebar:
                             st.error(msg)
 
 # --- TABS ---
-tab1, tab2, tab3 = st.tabs(["💬 Ask GambiaGPT", "🔐 Cybersecurity Lab", "🌐 Networking Lab"])
+tab1, tab2, tab3, tab4 = st.tabs(["💬 Ask GambiaGPT", "🔐 Cybersecurity Lab", "🌐 Networking Lab", "🗺️ Gambia Map"])
 
 # ── TAB 1: CHAT ──
 with tab1:
@@ -359,3 +361,152 @@ with tab3:
         if net_q:
             with st.spinner("Consulting the network engineer..."):
                 st.markdown(get_answer(f"As a senior network engineer: {net_q}. Include commands and configs."))
+                # ── TAB 4: INTERACTIVE MAP ──
+with tab4:
+    st.subheader("🗺️ Interactive Map of The Gambia")
+    st.caption("Explore tourist spots, hospitals, universities and more.")
+
+    # Filter options
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        map_filter = st.multiselect(
+            "Show on map:",
+            ["Tourist spots", "Hospitals", "Universities", "Hotels", "Markets", "Embassies"],
+            default=["Tourist spots"]
+        )
+    with col2:
+        map_style = st.selectbox("Map style:", ["OpenStreetMap", "CartoDB positron", "CartoDB dark_matter"])
+
+    # Create base map centered on Gambia
+    m = folium.Map(
+        location=[13.4549, -15.3100],
+        zoom_start=8,
+        tiles=map_style
+    )
+
+    # --- TOURIST SPOTS ---
+    tourist_spots = [
+        {"name": "Kachikally Crocodile Pool", "lat": 13.4441, "lon": -16.6774, "desc": "Sacred crocodile pool in Bakau. One of Gambia's most visited attractions.", "region": "West Coast"},
+        {"name": "Abuko Nature Reserve", "lat": 13.3833, "lon": -16.6500, "desc": "Gambia's first nature reserve. Home to monkeys, birds, and reptiles.", "region": "West Coast"},
+        {"name": "Janjanbureh Island", "lat": 13.5500, "lon": -14.7667, "desc": "Historic island town. Former colonial capital, rich in history.", "region": "Central River"},
+        {"name": "Wassu Stone Circles", "lat": 13.6833, "lon": -14.9167, "desc": "UNESCO World Heritage Site. Ancient stone circles dating back 1,000 years.", "region": "Central River"},
+        {"name": "River Gambia National Park", "lat": 13.5833, "lon": -14.9000, "desc": "Home to chimpanzees and hippos along the River Gambia.", "region": "Central River"},
+        {"name": "Bijilo Forest Park", "lat": 13.4167, "lon": -16.7167, "desc": "Coastal forest park with green vervet monkeys and diverse birdlife.", "region": "West Coast"},
+        {"name": "Tanji Bird Reserve", "lat": 13.3667, "lon": -16.7167, "desc": "Important bird watching site on the Atlantic coast.", "region": "West Coast"},
+        {"name": "Kartong Beach", "lat": 13.0833, "lon": -16.7500, "desc": "Unspoiled beach at the southern tip of Gambia. Peaceful and scenic.", "region": "West Coast"},
+        {"name": "Banjul Albert Market", "lat": 13.4531, "lon": -16.5731, "desc": "Gambia's biggest market. Everything from fabrics to spices and crafts.", "region": "Banjul"},
+        {"name": "Arch 22", "lat": 13.4533, "lon": -16.5756, "desc": "Iconic monument in Banjul. Great views of the city from the top.", "region": "Banjul"},
+        {"name": "Serrekunda Market", "lat": 13.4386, "lon": -16.6775, "desc": "Largest market in Gambia. Vibrant and full of local culture.", "region": "West Coast"},
+        {"name": "James Island", "lat": 13.4833, "lon": -16.5333, "desc": "UNESCO World Heritage Site. Former slave trade fort in the River Gambia.", "region": "West Coast"},
+    ]
+
+    # --- HOSPITALS ---
+    hospitals = [
+        {"name": "Royal Victoria Teaching Hospital", "lat": 13.4544, "lon": -16.5786, "desc": "Gambia's main national hospital in Banjul. Largest medical facility.", "region": "Banjul"},
+        {"name": "Edward Francis Small Teaching Hospital", "lat": 13.4544, "lon": -16.5786, "desc": "Main referral hospital serving greater Banjul area.", "region": "Banjul"},
+        {"name": "Serekunda General Hospital", "lat": 13.4386, "lon": -16.6775, "desc": "Major hospital serving the greater Serekunda area.", "region": "West Coast"},
+        {"name": "Bansang Hospital", "lat": 13.4667, "lon": -14.6500, "desc": "Main hospital for Central River Region.", "region": "Central River"},
+        {"name": "Farafenni Hospital", "lat": 13.5667, "lon": -15.6000, "desc": "Main hospital for North Bank Region.", "region": "North Bank"},
+        {"name": "Kanifing Hospital", "lat": 13.4500, "lon": -16.6667, "desc": "Hospital serving Kanifing Municipal area.", "region": "West Coast"},
+        {"name": "MRC Gambia", "lat": 13.4167, "lon": -16.6667, "desc": "Medical Research Council — world-class research hospital.", "region": "West Coast"},
+    ]
+
+    # --- UNIVERSITIES ---
+    universities = [
+        {"name": "University of The Gambia", "lat": 13.4167, "lon": -16.6500, "desc": "Gambia's national university. Offers degrees in medicine, law, engineering and more.", "region": "West Coast"},
+        {"name": "GTTI — Gambia Technical Training Institute", "lat": 13.4500, "lon": -16.6500, "desc": "Technical and vocational training institute.", "region": "West Coast"},
+        {"name": "Gambia College", "lat": 13.3833, "lon": -16.6833, "desc": "Teacher training and nursing college.", "region": "West Coast"},
+        {"name": "American International University", "lat": 13.4500, "lon": -16.6400, "desc": "Private international university in Kanifing.", "region": "West Coast"},
+        {"name": "Management Development Institute", "lat": 13.4400, "lon": -16.6600, "desc": "Business and management studies institute.", "region": "West Coast"},
+    ]
+
+    # --- HOTELS ---
+    hotels = [
+        {"name": "Coco Ocean Resort", "lat": 13.4167, "lon": -16.7333, "desc": "5-star luxury resort on the Atlantic coast.", "region": "West Coast"},
+        {"name": "Sunset Beach Hotel", "lat": 13.4167, "lon": -16.7167, "desc": "Popular beachfront hotel in Kololi.", "region": "West Coast"},
+        {"name": "Kairaba Beach Hotel", "lat": 13.4167, "lon": -16.7200, "desc": "One of Gambia's top beach hotels.", "region": "West Coast"},
+        {"name": "Laico Atlantic Hotel", "lat": 13.4533, "lon": -16.5867, "desc": "Business hotel in central Banjul.", "region": "Banjul"},
+        {"name": "Ngala Lodge", "lat": 13.4833, "lon": -16.6833, "desc": "Boutique eco-lodge in Bakau.", "region": "West Coast"},
+        {"name": "Mandina Lodges", "lat": 13.5000, "lon": -15.8000, "desc": "Stunning eco-lodge on the River Gambia.", "region": "Central River"},
+    ]
+
+    # --- MARKETS ---
+    markets = [
+        {"name": "Albert Market Banjul", "lat": 13.4531, "lon": -16.5731, "desc": "Gambia's oldest and most famous market.", "region": "Banjul"},
+        {"name": "Serrekunda Market", "lat": 13.4386, "lon": -16.6775, "desc": "Largest market in Gambia.", "region": "West Coast"},
+        {"name": "Brikama Market", "lat": 13.2667, "lon": -16.6500, "desc": "Known for wood carvings and crafts.", "region": "West Coast"},
+        {"name": "Tanji Fish Market", "lat": 13.3667, "lon": -16.7167, "desc": "Busy fishing village market on the coast.", "region": "West Coast"},
+        {"name": "Bakau Market", "lat": 13.4667, "lon": -16.6833, "desc": "Local market in Bakau town.", "region": "West Coast"},
+    ]
+
+    # --- EMBASSIES ---
+    embassies = [
+        {"name": "US Embassy Banjul", "lat": 13.4533, "lon": -16.5800, "desc": "United States Embassy in Banjul.", "region": "Banjul"},
+        {"name": "UK High Commission", "lat": 13.4500, "lon": -16.5750, "desc": "British High Commission in Banjul.", "region": "Banjul"},
+        {"name": "EU Delegation Gambia", "lat": 13.4520, "lon": -16.5780, "desc": "European Union Delegation in Banjul.", "region": "Banjul"},
+        {"name": "Senegal Embassy", "lat": 13.4510, "lon": -16.5760, "desc": "Embassy of Senegal in Banjul.", "region": "Banjul"},
+        {"name": "China Embassy", "lat": 13.4490, "lon": -16.5790, "desc": "Embassy of China in Banjul.", "region": "Banjul"},
+    ]
+
+    # Color and icon mapping
+    category_config = {
+        "Tourist spots": {"data": tourist_spots, "color": "green", "icon": "star"},
+        "Hospitals": {"data": hospitals, "color": "red", "icon": "plus"},
+        "Universities": {"data": universities, "color": "blue", "icon": "graduation-cap"},
+        "Hotels": {"data": hotels, "color": "purple", "icon": "home"},
+        "Markets": {"data": markets, "color": "orange", "icon": "shopping-cart"},
+        "Embassies": {"data": embassies, "color": "darkblue", "icon": "flag"},
+    }
+
+    # Add markers for selected categories
+    for category in map_filter:
+        if category in category_config:
+            config = category_config[category]
+            for place in config["data"]:
+                folium.Marker(
+                    location=[place["lat"], place["lon"]],
+                    popup=folium.Popup(
+                        f"<b>{place['name']}</b><br>{place['desc']}<br><i>{place['region']}</i>",
+                        max_width=250
+                    ),
+                    tooltip=place["name"],
+                    icon=folium.Icon(
+                        color=config["color"],
+                        icon=config["icon"],
+                        prefix="fa"
+                    )
+                ).add_to(m)
+
+    # Add river Gambia line
+    folium.PolyLine(
+        locations=[
+            [13.4667, -16.5833],
+            [13.4833, -16.3000],
+            [13.5000, -15.8000],
+            [13.5500, -15.3000],
+            [13.5500, -14.9000],
+            [13.5500, -14.6500],
+        ],
+        color="blue",
+        weight=3,
+        opacity=0.6,
+        tooltip="River Gambia"
+    ).add_to(m)
+
+    # Display map
+    map_data = st_folium(m, width=700, height=500)
+
+    # Show clicked location info
+    if map_data["last_object_clicked_popup"]:
+        st.info(f"Selected: {map_data['last_object_clicked_popup']}")
+
+    st.divider()
+
+    # Stats
+    col_a, col_b, col_c, col_d = st.columns(4)
+    col_a.metric("Tourist spots", len(tourist_spots))
+    col_b.metric("Hospitals", len(hospitals))
+    col_c.metric("Universities", len(universities))
+    col_d.metric("Hotels", len(hotels))
+
+    st.caption("Click any marker on the map to see details. Use the filter above to show different categories.")
