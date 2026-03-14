@@ -9,14 +9,35 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Gambian websites to scrape
 TARGETS = [
+    # Government
     {"url": "https://www.statehouse.gm", "name": "statehouse"},
+    {"url": "https://www.moj.gov.gm", "name": "ministry_justice"},
+    {"url": "https://www.moh.gov.gm", "name": "ministry_health"},
+    {"url": "https://www.moe.gov.gm", "name": "ministry_education"},
+    {"url": "https://www.mofa.gov.gm", "name": "ministry_foreign_affairs"},
+    {"url": "https://www.grts.gm", "name": "grts_tv"},
+
+    # News
+    {"url": "https://thepoint.gm", "name": "thepoint"},
+    {"url": "https://foroyaa.net", "name": "foroyaa"},
+    {"url": "https://gainako.com", "name": "gainako"},
+    {"url": "https://www.thestandard.gm", "name": "standard_newspaper"},
+    {"url": "https://smbcnewsgambia.com", "name": "smbc_news"},
+
+    # Tourism & Business
     {"url": "https://www.visitthegambia.gm", "name": "tourism"},
-    {"url": "https://thepoint.gm", "name": "thepoint_news"},
-    {"url": "https://foroyaa.net", "name": "foroyaa_news"},
+    {"url": "https://www.gcci.gm", "name": "chamber_commerce"},
+    {"url": "https://www.gnpc.gm", "name": "petroleum"},
+
+    # Education
+    {"url": "https://www.utm.edu.gm", "name": "university_gambia"},
+
+    # Health
+    {"url": "https://www.mrc.gm", "name": "medical_research"},
 ]
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; GambiaGPT-bot/1.0)"}
-MAX_PAGES = 30  # per site
+MAX_PAGES = 50  # per site
 
 def get_links(base_url, soup):
     links = set()
