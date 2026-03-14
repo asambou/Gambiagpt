@@ -13,7 +13,6 @@ requests
 tavily-python
 supabase
 bcrypt
-twilio
-flask
 folium
 streamlit-folium
+feedparser
