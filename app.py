@@ -55,6 +55,19 @@ def load_retriever():
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
     db = FAISS.load_local(VECTOR_PATH, embeddings, allow_dangerous_deserialization=True)
     return db.as_retriever(search_kwargs={"k": 3})
+@st.cache_resource
+def load_legal_retriever():
+    try:
+        embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+        db = FAISS.load_local(
+            "vectorstore_legal",
+            embeddings,
+            allow_dangerous_deserialization=True
+        )
+        return db.as_retriever(search_kwargs={"k": 4})
+    except:
+        return load_retriever()
+
 
 def web_search(query):
     try:
@@ -81,6 +94,55 @@ def get_answer(query):
         return chain.invoke({"context": combined_context, "question": query})
     except:
         return "Sorry, something went wrong. Please try again."
+    
+def get_legal_answer(query):
+    try:
+        retriever = load_legal_retriever()
+        docs = retriever.invoke(query)
+
+        context_with_sources = ""
+        sources = []
+        for doc in docs:
+            context_with_sources += doc.page_content + "\n\n"
+            source = doc.metadata.get("source", "Gambian Law")
+            if source not in sources:
+                sources.append(source)
+
+        context_with_sources = context_with_sources[:2000]
+
+        web_context = web_search(f"{query} Gambia law legislation")
+
+        combined = f"LEGAL DOCUMENTS:\n{context_with_sources}\n\nWEB RESEARCH:\n{web_context}"
+
+        llm = ChatGroq(
+            model="llama-3.3-70b-versatile",
+            api_key=st.secrets["GROQ_API_KEY"],
+            temperature=0.1
+        )
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a Gambian legal expert and constitutional scholar.
+Answer legal questions based on Gambian law.
+Always cite the specific law, act, or constitutional article you are referencing.
+Be precise, clear, and use plain language so ordinary citizens understand.
+Format your answer with:
+1. Direct answer
+2. Legal basis (which law or article)
+3. Practical implications
+If you are not certain, say so clearly."""),
+            ("human", "Legal question: {question}\n\nContext from Gambian laws:\n{context}")
+        ])
+
+        chain = prompt | llm | StrOutputParser()
+        answer = chain.invoke({"question": query, "context": combined})
+
+        if sources:
+            clean_sources = [s.split("/")[-1] for s in sources]
+            answer += f"\n\n📚 **Sources:** {', '.join(clean_sources)}"
+
+        return answer
+    except Exception as e:
+        return get_answer(query)
 
 def hash_password(password):
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -592,7 +654,8 @@ elif page == "📞 Emergency":
 # ════════════════════════════════════════
 # ── PAGE: LEGAL & LAW ──
 # ════════════════════════════════════════
-elif page == "⚖️ Legal & Law":
+elif 
+page == "⚖️ Legal & Law":
     st.title("⚖️ Legal & Law Guide — The Gambia")
     st.caption("Know your rights as a Gambian citizen.")
 
@@ -624,13 +687,13 @@ elif page == "⚖️ Legal & Law":
         selected = st.selectbox("Choose a constitutional topic:", topics)
         if st.button("Get explanation", type="primary"):
             with st.spinner("Reading the constitution..."):
-                st.markdown(get_answer(f"Based on the 1997 Gambian Constitution explain: {selected}. Give clear detailed explanation with article references where possible."))
+                st.markdown(get_legal_answer(f"Based on the 1997 Gambian Constitution explain: {selected}. Give clear detailed explanation with article references where possible."))
         st.divider()
         custom_q = st.text_area("Ask your own constitutional question:")
         if st.button("Ask", key="const_ask"):
             if custom_q:
                 with st.spinner("Consulting the constitution..."):
-                    st.markdown(get_answer(f"Based on Gambian law and constitution: {custom_q}"))
+                    st.markdown(get_legal_answer(f"Based on Gambian law and constitution: {custom_q}"))
 
     elif legal_section == "Your Rights":
         st.subheader("🛡️ Know Your Rights in Gambia")
@@ -651,7 +714,7 @@ elif page == "⚖️ Legal & Law":
             with col1 if i % 2 == 0 else col2:
                 if st.button(f"🛡️ {topic}", key=f"rights_{i}"):
                     with st.spinner("Loading..."):
-                        st.markdown(get_answer(query))
+                        st.markdown(get_legal_answer(query))
 
     elif legal_section == "Business Law":
         st.subheader("💼 Business Law in Gambia")
@@ -670,7 +733,7 @@ elif page == "⚖️ Legal & Law":
         selected_biz = st.selectbox("Business law topic:", biz_topics)
         if st.button("Get legal guidance", type="primary"):
             with st.spinner("Consulting business law..."):
-                st.markdown(get_answer(f"As a Gambian business lawyer: {selected_biz}. Give practical step by step guidance."))
+                st.markdown(get_legal_answer(f"As a Gambian business lawyer: {selected_biz}. Give practical step by step guidance."))
         st.divider()
         st.subheader("📋 Business Registration Steps")
         st.markdown("""
@@ -706,7 +769,7 @@ elif page == "⚖️ Legal & Law":
         selected_family = st.selectbox("Family law topic:", family_topics)
         if st.button("Get legal guidance", type="primary", key="family_btn"):
             with st.spinner("Consulting family law..."):
-                st.markdown(get_answer(f"As a Gambian family lawyer explain: {selected_family}"))
+                st.markdown(get_legal_answer(f"As a Gambian family lawyer explain: {selected_family}"))
 
     elif legal_section == "Criminal Law":
         st.subheader("⚖️ Criminal Law in Gambia")
@@ -724,7 +787,7 @@ elif page == "⚖️ Legal & Law":
         selected_criminal = st.selectbox("Criminal law topic:", criminal_topics)
         if st.button("Get legal guidance", type="primary", key="criminal_btn"):
             with st.spinner("Consulting criminal law..."):
-                st.markdown(get_answer(f"As a Gambian criminal lawyer explain: {selected_criminal}"))
+                st.markdown(get_legal_answer(f"As a Gambian criminal lawyer explain: {selected_criminal}"))
         st.divider()
         st.subheader("🏛️ Court System in Gambia")
         st.markdown("""
@@ -755,7 +818,7 @@ elif page == "⚖️ Legal & Law":
         selected_land = st.selectbox("Land law topic:", land_topics)
         if st.button("Get legal guidance", type="primary", key="land_btn"):
             with st.spinner("Consulting property law..."):
-                st.markdown(get_answer(f"As a Gambian property lawyer explain: {selected_land}"))
+                st.markdown(get_legal_answer(f"As a Gambian property lawyer explain: {selected_land}"))
         st.divider()
         st.subheader("📋 How to Buy Land in Gambia")
         st.markdown("""
@@ -785,13 +848,13 @@ elif page == "⚖️ Legal & Law":
         for q in quick_legal:
             if st.button(f"⚖️ {q}", key=f"legal_{q}"):
                 with st.spinner("Consulting..."):
-                    st.markdown(get_answer(f"As a Gambian legal advisor: {q}"))
+                    st.markdown(get_legal_answer(f"As a Gambian legal advisor: {q}"))
         st.divider()
         legal_q = st.text_area("Your legal question:")
         if st.button("Ask legal advisor", type="primary"):
             if legal_q:
                 with st.spinner("Consulting Gambian law..."):
-                    st.markdown(get_answer(f"As a Gambian legal advisor answer: {legal_q}. Give clear practical guidance and mention relevant laws."))
+                    st.markdown(get_legal_answer(f"As a Gambian legal advisor answer: {legal_q}. Give clear practical guidance and mention relevant laws."))
         st.divider()
         st.subheader("🏛️ Legal Aid in Gambia")
         st.markdown("""

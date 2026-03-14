@@ -19,6 +19,11 @@ TARGETS = [
     {"url": "https://whatson-gambia.com", "name": "whatson_gambia"},
     {"url": "https://www.kerrfatou.com", "name": "kerr_fatou"},
     {"url": "https://fatunetwork.net", "name": "fatu_network"},
+    {"url": "https://www.moj.gov.gm", "name": "ministry_justice"},
+    {"url": "https://www.judiciary.gm", "name": "judiciary_gambia"},
+    {"url": "https://www.gra.gm", "name": "gambia_revenue"},
+    {"url": "https://www.nhrc.gm", "name": "human_rights_commission"},
+    {"url": "https://www.giepa.gm", "name": "investment_promotion"},
 
     # News
     {"url": "https://thepoint.gm", "name": "thepoint"},
@@ -34,6 +39,9 @@ TARGETS = [
 
     # Education
     {"url": "https://www.utm.edu.gm", "name": "university_gambia"},
+    {"url": "https://www.utm.edu.gm", "name": "university_gambia"},
+    {"url": "https://www.gambiacollege.edu.gm", "name": "gambia_college"},
+    {"url": "https://www.gtti.edu.gm", "name": "gtti"},
 
     # Health
     {"url": "https://www.mrc.gm", "name": "medical_research"},
