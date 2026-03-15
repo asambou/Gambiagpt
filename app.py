@@ -349,6 +349,8 @@ with st.sidebar:
 # ── PAGE: CHAT ──
 # ════════════════════════════════════════
 if page == "💬 Chat":
+    st.title("💬 Ask GambiaGPT")
+    st.info("💬 Ask in English...")
     st.info("💬 Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
     st.caption("⚠️ For critical decisions always verify important facts with official Gambian sources.")
 
@@ -1024,7 +1026,8 @@ elif page == "⚖️ Legal & Law":
 - **Women's Lawyers Association** — Legal help for women and children
 - **Institute for Human Rights and Development** — Human rights cases
         """)
-        # ════════════════════════════════════════
+        
+# ════════════════════════════════════════
 # ── PAGE: JOBS BOARD ──
 # ════════════════════════════════════════
 elif page == "💼 Jobs Board":
