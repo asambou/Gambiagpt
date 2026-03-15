@@ -9,10 +9,11 @@ from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from tavily import TavilyClient
 import bcrypt
 from datetime import datetime
+
 
 VECTOR_PATH = "vectorstore"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -108,11 +109,11 @@ def get_answer(query):
         if not web_context:
             web_context = "No web results available."
         combined_context = f"WEB SEARCH RESULTS:\n{web_context}\n\nKNOWLEDGE BASE:\n{doc_context}"
-        llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            api_key=st.secrets["GROQ_API_KEY"],
-            temperature=0.1
-        )
+        llm = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=st.secrets["GOOGLE_API_KEY"],
+    temperature=0.1
+)
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
             ("human", "Context:\n{context}\n\nQuestion: {question}")
@@ -141,11 +142,11 @@ def get_legal_answer(query):
 
         combined = f"LEGAL DOCUMENTS:\n{context_with_sources}\n\nWEB RESEARCH:\n{web_context}"
 
-        llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            api_key=st.secrets["GROQ_API_KEY"],
-            temperature=0.1
-        )
+        llm = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=st.secrets["GOOGLE_API_KEY"],
+    temperature=0.1
+)
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a Gambian legal expert and constitutional scholar.
