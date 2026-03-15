@@ -104,20 +104,14 @@ def get_answer(query):
         retriever = load_retriever()
         docs = retriever.invoke(query)
         doc_context = "\n\n".join(doc.page_content for doc in docs)[:600]
-
-        # Always search web first
         web_context = web_search(query)
-
-        # Warn if web search returned nothing
         if not web_context:
-            web_context = "NOTE: Live web search unavailable for this query. Answer based on knowledge base only — please verify current facts independently."
-
-        combined_context = f"WEB SEARCH RESULTS (use these first for current facts):\n{web_context}\n\nKNOWLEDGE BASE (use for background context):\n{doc_context}"
-
+            web_context = "No web results available."
+        combined_context = f"WEB SEARCH RESULTS:\n{web_context}\n\nKNOWLEDGE BASE:\n{doc_context}"
         llm = ChatGroq(
             model="llama-3.3-70b-versatile",
             api_key=st.secrets["GROQ_API_KEY"],
-            temperature=0.1  # Lower temperature = more factual
+            temperature=0.1
         )
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
@@ -125,8 +119,8 @@ def get_answer(query):
         ])
         chain = prompt | llm | StrOutputParser()
         return chain.invoke({"context": combined_context, "question": query})
-    except:
-        return "Sorry, something went wrong. Please try again."
+    except Exception as e:
+        return f"DEBUG: {str(e)}"
     
 def get_legal_answer(query):
     try:
