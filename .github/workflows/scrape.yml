@@ -1,0 +1,41 @@
+name: Auto Scrape Gambia Data
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Runs every day at 2am
+  workflow_dispatch:       # Also allows manual trigger from GitHub
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install langchain langchain-community langchain-huggingface
+          pip install faiss-cpu sentence-transformers pypdf
+          pip install requests beautifulsoup4 tqdm
+
+      - name: Run scraper
+        run: python scraper.py
+
+      - name: Run ingest
+        run: python ingest.py
+
+      - name: Commit and push updated vectorstore
+        run: |
+          git config --global user.name "GambiaGPT Bot"
+          git config --global user.email "bot@gambiagpt.com"
+          git add vectorstore/ data/documents/
+          git diff --staged --quiet || git commit -m "Auto update knowledge base $(date '+%Y-%m-%d')"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
