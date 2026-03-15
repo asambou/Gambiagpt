@@ -116,12 +116,16 @@ def get_answer(query):
         combined_context = f"WEB SEARCH RESULTS (use these first for current facts):\n{web_context}\n\nKNOWLEDGE BASE (use for background context):\n{doc_context}"
 
         llm = ChatOpenAI(
-   		 model="google/gemini-2.0-flash-001",
-    	openai_api_key=st.secrets["OPENROUTER_API_KEY"],
-    	openai_api_base="https://openrouter.ai/api/v1",
-    	temperature=0.1,
-    	max_tokens=1000
-        )
+        model="google/gemini-2.0-flash-001",
+        openai_api_key=st.secrets["OPENROUTER_API_KEY"],
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0.1,
+        max_tokens=1000,
+        default_headers={
+        "HTTP-Referer": "https://gambiagpt.streamlit.app",
+        "X-Title": "GambiaGPT"
+    }
+)
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
             ("human", "Context:\n{context}\n\nQuestion: {question}")
@@ -151,11 +155,15 @@ def get_legal_answer(query):
         combined = f"LEGAL DOCUMENTS:\n{context_with_sources}\n\nWEB RESEARCH:\n{web_context}"
 
         llm = ChatOpenAI(
-         model="google/gemini-2.0-flash-001",
+        model="google/gemini-2.0-flash-001",
         openai_api_key=st.secrets["OPENROUTER_API_KEY"],
-        openai_api_base="https://openrouter.ai/api/v1",
+        base_url="https://openrouter.ai/api/v1",
         temperature=0.1,
-         max_tokens=1000
+        max_tokens=1000,
+        default_headers={
+        "HTTP-Referer": "https://gambiagpt.streamlit.app",
+        "X-Title": "GambiaGPT"
+    }
 )
 
         prompt = ChatPromptTemplate.from_messages([
