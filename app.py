@@ -42,7 +42,9 @@ ANSWER STYLE:
 - Be confident, warm, and detailed like a senior network engineer and Gambian scholar.
 - For technical questions give real commands, configs, and examples.
 - Never say the context does not mention — just answer naturally.
-- Always encourage Gambian youth in tech careers.
+- Only mention tech careers if the user is specifically asking about technology, cybersecurity, or networking topics.
+- Never suggest career advice unless the user asks for it.
+- Stay focused and relevant to what the user is actually asking about.
 """
 
 # ── HELPERS ──
