@@ -12,6 +12,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
 from tavily import TavilyClient
 import bcrypt
+from datetime import datetime
 
 VECTOR_PATH = "vectorstore"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -195,6 +196,17 @@ def clear_history(user_id):
         get_supabase().table("chat_history").delete().eq("user_id", user_id).execute()
     except:
         pass
+def save_feedback(question, answer, rating, comment=""):
+    try:
+        get_supabase().table("feedback").insert({
+            "question": question,
+            "answer": answer,
+            "rating": rating,
+            "comment": comment
+        }).execute()
+        return True
+    except:
+        return False
 
 def subnet_calculator(ip, prefix):
     try:
@@ -282,6 +294,19 @@ with st.sidebar:
                         st.success(msg) if success else st.error(msg)
 
     st.divider()
+    # Admin feedback viewer
+    if st.session_state.user and st.session_state.user.get("email") == "alexsambou@gmail.com":
+        st.divider()
+        if st.button("📊 View feedback"):
+            try:
+                result = get_supabase().table("feedback").select("*").order("created_at", desc=True).limit(20).execute()
+                if result.data:
+                    st.subheader("Recent feedback")
+                    for f in result.data:
+                        st.write(f"⭐ {f['rating']} — {f.get('comment', 'No comment')}")
+                        st.caption(f"Q: {f['question'][:80]}...")
+            except:
+                st.error("Could not load feedback.")
     st.caption("Built for Gambia 🇬🇲 | Free to use")
 
 # ════════════════════════════════════════
@@ -291,22 +316,121 @@ if page == "💬 Chat":
     st.title("💬 Ask GambiaGPT")
     st.info("Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
 
+    # Voice input note
+    st.caption("🎤 Voice input: Use your keyboard microphone key or browser voice typing to speak your question.")
+
+    # Initialize session state
+    if "last_question" not in st.session_state:
+        st.session_state.last_question = ""
+    if "last_answer" not in st.session_state:
+        st.session_state.last_answer = ""
+    if "feedback_given" not in st.session_state:
+        st.session_state.feedback_given = False
+
+    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if query := st.chat_input("Ask anything about Gambia, cybersecurity, or networking..."):
+    # Auto scroll anchor
+    st.markdown('<div id="bottom"></div>', unsafe_allow_html=True)
+    st.markdown("""
+        <script>
+            window.scrollTo(0, document.body.scrollHeight);
+        </script>
+    """, unsafe_allow_html=True)
+
+    # Chat input
+    if query := st.chat_input("Jaarama / Salaam / Hello — ask me anything about Gambia..."):
+        st.session_state.feedback_given = False
         st.session_state.messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
             st.markdown(query)
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
+            with st.spinner("Searching and thinking..."):
                 answer = get_answer(query)
                 st.markdown(answer)
+
+                # Scroll down arrow
+                st.markdown("""
+                    <div style="text-align:center; font-size:24px; margin-top:10px;">
+                        ⬇️ <a href="#bottom" style="text-decoration:none; color:inherit;">See response below</a>
+                    </div>
+                    <script>window.scrollTo(0, document.body.scrollHeight);</script>
+                """, unsafe_allow_html=True)
+
         st.session_state.messages.append({"role": "assistant", "content": answer})
+        st.session_state.last_question = query
+        st.session_state.last_answer = answer
+
         if st.session_state.user:
             save_message(st.session_state.user["id"], "user", query)
             save_message(st.session_state.user["id"], "assistant", answer)
+
+    # ── FEEDBACK SECTION ──
+    if st.session_state.last_answer and not st.session_state.feedback_given:
+        st.divider()
+        st.subheader("📝 How was this response?")
+        st.caption("Your feedback helps improve GambiaGPT for everyone.")
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+        rating = None
+
+        with col1:
+            if st.button("⭐ 1 — Poor"):
+                rating = 1
+        with col2:
+            if st.button("⭐⭐ 2 — Fair"):
+                rating = 2
+        with col3:
+            if st.button("⭐⭐⭐ 3 — Good"):
+                rating = 3
+        with col4:
+            if st.button("⭐⭐⭐⭐ 4 — Great"):
+                rating = 4
+        with col5:
+            if st.button("⭐⭐⭐⭐⭐ 5 — Excellent"):
+                rating = 5
+
+        feedback_comment = st.text_input(
+            "Optional comment:",
+            placeholder="What could be improved? What was great?"
+        )
+
+        if rating:
+            if save_feedback(
+                st.session_state.last_question,
+                st.session_state.last_answer,
+                rating,
+                feedback_comment
+            ):
+                st.success("Thank you for your feedback! It helps make GambiaGPT better for all Gambians. 🇬🇲")
+                st.session_state.feedback_given = True
+                st.rerun()
+            else:
+                st.error("Could not save feedback. Please try again.")
+
+    # ── VOICE INPUT GUIDE ──
+    with st.expander("🎤 How to use voice input"):
+        st.markdown("""
+**On Windows:**
+- Press **Windows key + H** to open voice typing
+- Click the microphone and speak your question
+
+**On Mac:**
+- Press **Fn** key twice to enable dictation
+- Speak your question into the chat box
+
+**On iPhone/Android:**
+- Tap the microphone icon on your keyboard
+- Speak your question in any language
+
+**On Chrome browser:**
+- Right-click the chat input box
+- Select "Use microphone" if available
+
+💡 Tip: You can speak in Mandinka, Wolof, Fula, or Jola and GambiaGPT will understand!
+        """)
 
 # ════════════════════════════════════════
 # ── PAGE: NEWS ──
