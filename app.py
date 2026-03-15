@@ -9,7 +9,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from tavily import TavilyClient
 import bcrypt
 from datetime import datetime
@@ -105,23 +105,31 @@ def get_answer(query):
         retriever = load_retriever()
         docs = retriever.invoke(query)
         doc_context = "\n\n".join(doc.page_content for doc in docs)[:600]
+
+        # Always search web first
         web_context = web_search(query)
+
+        # Warn if web search returned nothing
         if not web_context:
-            web_context = "No web results available."
-        combined_context = f"WEB SEARCH RESULTS:\n{web_context}\n\nKNOWLEDGE BASE:\n{doc_context}"
-        llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    google_api_key=st.secrets["GOOGLE_API_KEY"],
-    temperature=0.1
-)
+            web_context = "NOTE: Live web search unavailable for this query. Answer based on knowledge base only — please verify current facts independently."
+
+        combined_context = f"WEB SEARCH RESULTS (use these first for current facts):\n{web_context}\n\nKNOWLEDGE BASE (use for background context):\n{doc_context}"
+
+        llm = ChatOpenAI(
+   		 model="google/gemini-2.0-flash-001",
+    	openai_api_key=st.secrets["OPENROUTER_API_KEY"],
+    	openai_api_base="https://openrouter.ai/api/v1",
+    	temperature=0.1,
+    	max_tokens=1000
+        )
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
             ("human", "Context:\n{context}\n\nQuestion: {question}")
         ])
         chain = prompt | llm | StrOutputParser()
         return chain.invoke({"context": combined_context, "question": query})
-    except Exception as e:
-        return f"DEBUG: {str(e)}"
+    except:
+        return "Sorry, something went wrong. Please try again."
     
 def get_legal_answer(query):
     try:
@@ -142,10 +150,12 @@ def get_legal_answer(query):
 
         combined = f"LEGAL DOCUMENTS:\n{context_with_sources}\n\nWEB RESEARCH:\n{web_context}"
 
-        llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    google_api_key=st.secrets["GOOGLE_API_KEY"],
-    temperature=0.1
+        llm = ChatOpenAI(
+         model="google/gemini-2.0-flash-001",
+        openai_api_key=st.secrets["OPENROUTER_API_KEY"],
+        openai_api_base="https://openrouter.ai/api/v1",
+        temperature=0.1,
+         max_tokens=1000
 )
 
         prompt = ChatPromptTemplate.from_messages([
