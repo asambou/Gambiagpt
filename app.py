@@ -40,12 +40,16 @@ LANGUAGE RULES:
 - Reply in English for all other languages.
 
 ANSWER STYLE:
-- Be confident, warm, and detailed like a senior network engineer and Gambian scholar.
-- For technical questions give real commands, configs, and examples.
-- Never say the context does not mention — just answer naturally.
+- Always prioritize web search results over your training knowledge for current events.
+- For any question about people, events, dates, or news ALWAYS use the web search results.
+- If web search results are available use them as your primary source.
+- If you are not 100% certain about a date or fact say "Based on available information" or "Please verify this".
+- Never state a specific date or year unless it comes from the web search results provided.
+- For questions about current leaders, recent events, or ongoing situations always rely on web search.
 - Only mention tech careers if the user is specifically asking about technology, cybersecurity, or networking topics.
 - Never suggest career advice unless the user asks for it.
 - Stay focused and relevant to what the user is actually asking about.
+- If information may have changed recently add: "For the most current information please check a Gambian news source."
 """
 
 # ── HELPERS ──
@@ -75,7 +79,21 @@ def load_legal_retriever():
 def web_search(query):
     try:
         tavily = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-        results = tavily.search(query=query, max_results=5)
+
+        # Add current year to queries about events and people
+        current_keywords = ["president", "minister", "election", "news", "latest", "recent", "current", "today", "2026", "barrow", "assembly", "un", "united nations"]
+        needs_current = any(word in query.lower() for word in current_keywords)
+
+        if needs_current:
+            enhanced_query = f"{query} 2026 latest"
+        else:
+            enhanced_query = query
+
+        results = tavily.search(
+            query=enhanced_query,
+            max_results=5,
+            search_depth="advanced"
+        )
         texts = [r["content"] for r in results.get("results", [])]
         return "\n\n".join(texts)[:2000]
     except:
@@ -86,9 +104,21 @@ def get_answer(query):
         retriever = load_retriever()
         docs = retriever.invoke(query)
         doc_context = "\n\n".join(doc.page_content for doc in docs)[:600]
+
+        # Always search web first
         web_context = web_search(query)
-        combined_context = f"WEB:\n{web_context}\n\nDOCS:\n{doc_context}"
-        llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=st.secrets["GROQ_API_KEY"], temperature=0.3)
+
+        # Warn if web search returned nothing
+        if not web_context:
+            web_context = "NOTE: Live web search unavailable for this query. Answer based on knowledge base only — please verify current facts independently."
+
+        combined_context = f"WEB SEARCH RESULTS (use these first for current facts):\n{web_context}\n\nKNOWLEDGE BASE (use for background context):\n{doc_context}"
+
+        llm = ChatGroq(
+            model="llama-3.3-70b-versatile",
+            api_key=st.secrets["GROQ_API_KEY"],
+            temperature=0.1  # Lower temperature = more factual
+        )
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
             ("human", "Context:\n{context}\n\nQuestion: {question}")
@@ -244,6 +274,7 @@ with st.sidebar:
         "🌐 Networking",
         "📞 Emergency",
         "⚖️ Legal & Law",
+        "💼 Jobs Board",
     ])
 
     st.divider()
@@ -313,8 +344,8 @@ with st.sidebar:
 # ── PAGE: CHAT ──
 # ════════════════════════════════════════
 if page == "💬 Chat":
-    st.title("💬 Ask GambiaGPT")
-    st.info("Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
+    st.info("💬 Ask in English, Mandinka, Wolof, Jola or Fula — powered by live web search.")
+    st.caption("⚠️ For critical decisions always verify important facts with official Gambian sources.")
 
     # Voice input note
     st.caption("🎤 Voice input: Use your keyboard microphone key or browser voice typing to speak your question.")
@@ -988,3 +1019,351 @@ elif page == "⚖️ Legal & Law":
 - **Women's Lawyers Association** — Legal help for women and children
 - **Institute for Human Rights and Development** — Human rights cases
         """)
+        # ════════════════════════════════════════
+# ── PAGE: JOBS BOARD ──
+# ════════════════════════════════════════
+elif page == "💼 Jobs Board":
+    st.title("💼 Jobs Board — The Gambia")
+    st.caption("Find jobs, internships, and opportunities in Gambia.")
+
+    jobs_section = st.radio("Section:", [
+        "Search Jobs",
+        "Job Categories",
+        "Post a Job",
+        "Career Advice",
+        "CV Tips",
+    ], horizontal=True)
+
+    # ── SEARCH JOBS ──
+    if jobs_section == "Search Jobs":
+        st.subheader("🔍 Search for Jobs in Gambia")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            job_query = st.text_input(
+                "Job title or keyword:",
+                placeholder="e.g. accountant, nurse, teacher, engineer"
+            )
+        with col2:
+            job_location = st.selectbox("Location:", [
+                "All Gambia",
+                "Banjul",
+                "Serekunda",
+                "Brikama",
+                "Kanifing",
+                "Farafenni",
+                "Bansang",
+                "Janjanbureh",
+            ])
+
+        job_sector = st.selectbox("Sector:", [
+            "All sectors",
+            "Government & Public Service",
+            "Health & Medicine",
+            "Education & Teaching",
+            "Technology & IT",
+            "Banking & Finance",
+            "NGO & Development",
+            "Tourism & Hospitality",
+            "Agriculture & Farming",
+            "Construction & Engineering",
+            "Media & Communications",
+            "Legal & Justice",
+            "Business & Management",
+        ])
+
+        if st.button("Search jobs", type="primary"):
+            if job_query:
+                with st.spinner("Searching for jobs in Gambia..."):
+                    search_query = f"{job_query} job vacancy {job_location} Gambia {job_sector} 2025"
+                    try:
+                        tavily = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
+                        results = tavily.search(
+                            query=search_query,
+                            max_results=8,
+                            search_depth="advanced"
+                        )
+                        if results.get("results"):
+                            st.success(f"Found {len(results['results'])} results for '{job_query}' in {job_location}")
+                            for i, job in enumerate(results["results"], 1):
+                                with st.expander(f"💼 {i}. {job.get('title', 'Job Opening')}"):
+                                    st.write(job.get("content", "")[:400] + "...")
+                                    if job.get("url"):
+                                        st.markdown(f"[View full job posting]({job['url']})")
+                        else:
+                            st.warning("No jobs found. Try different keywords.")
+                    except Exception as e:
+                        st.error(f"Search failed: {str(e)}")
+            else:
+                st.warning("Please enter a job title or keyword.")
+
+        st.divider()
+
+        # Featured job sites
+        st.subheader("🌐 Gambian Job Websites")
+        job_sites = [
+            {"name": "Gambia Jobs", "url": "https://www.gambiajobs.com", "desc": "Main Gambian job board"},
+            {"name": "GIEPA Opportunities", "url": "https://www.giepa.gm", "desc": "Investment and business opportunities"},
+            {"name": "UN Jobs Gambia", "url": "https://www.unjobs.org/duty_stations/gambia", "desc": "UN and international org jobs"},
+            {"name": "Gambia Government Jobs", "url": "https://www.statehouse.gm/vacancies", "desc": "Government vacancies"},
+            {"name": "LinkedIn Gambia", "url": "https://www.linkedin.com/jobs/gambia-jobs", "desc": "Professional network jobs"},
+            {"name": "NGO Jobs Africa", "url": "https://www.ngojobsafrica.org", "desc": "NGO positions in Gambia"},
+            {"name": "ReliefWeb Gambia", "url": "https://reliefweb.int/jobs?source=Gambia", "desc": "Humanitarian and development jobs"},
+        ]
+
+        for site in job_sites:
+            col_a, col_b, col_c = st.columns([2, 2, 1])
+            col_a.write(f"**{site['name']}**")
+            col_b.write(site["desc"])
+            col_c.markdown(f"[Visit]({site['url']})")
+
+    # ── JOB CATEGORIES ──
+    elif jobs_section == "Job Categories":
+        st.subheader("📂 Jobs by Category")
+
+        categories = {
+            "🏥 Health & Medicine": [
+                "Doctor / Physician",
+                "Nurse / Midwife",
+                "Pharmacist",
+                "Lab Technician",
+                "Health Officer",
+                "Community Health Worker",
+            ],
+            "🎓 Education & Teaching": [
+                "Primary School Teacher",
+                "Secondary School Teacher",
+                "University Lecturer",
+                "Head Teacher / Principal",
+                "Education Officer",
+                "Training Coordinator",
+            ],
+            "💻 Technology & IT": [
+                "Software Developer",
+                "Network Engineer",
+                "Cybersecurity Analyst",
+                "IT Support Technician",
+                "Data Analyst",
+                "Systems Administrator",
+            ],
+            "🏛️ Government & Public Service": [
+                "Civil Servant",
+                "Police Officer",
+                "Immigration Officer",
+                "Revenue Officer (GRA)",
+                "Social Worker",
+                "Agricultural Officer",
+            ],
+            "🌍 NGO & Development": [
+                "Project Manager",
+                "Programme Officer",
+                "M&E Officer",
+                "Field Officer",
+                "Finance Officer",
+                "Communications Officer",
+            ],
+            "🏦 Banking & Finance": [
+                "Bank Teller",
+                "Loan Officer",
+                "Accountant",
+                "Auditor",
+                "Financial Analyst",
+                "Branch Manager",
+            ],
+            "🌾 Agriculture": [
+                "Agricultural Officer",
+                "Farm Manager",
+                "Extension Worker",
+                "Veterinary Officer",
+                "Fisheries Officer",
+                "Food Safety Inspector",
+            ],
+            "🏨 Tourism & Hospitality": [
+                "Hotel Manager",
+                "Tour Guide",
+                "Chef / Cook",
+                "Front Desk Officer",
+                "Travel Agent",
+                "Event Coordinator",
+            ],
+        }
+
+        selected_cat = st.selectbox("Select category:", list(categories.keys()))
+
+        if selected_cat:
+            st.write(f"**Common roles in {selected_cat}:**")
+            roles = categories[selected_cat]
+            col1, col2 = st.columns(2)
+            for i, role in enumerate(roles):
+                with col1 if i % 2 == 0 else col2:
+                    if st.button(f"🔍 Find {role} jobs", key=f"cat_{i}_{role}"):
+                        with st.spinner(f"Searching for {role} jobs in Gambia..."):
+                            answer = get_answer(f"What are the job requirements, salary range, and where to find {role} jobs in Gambia? What qualifications are needed?")
+                            st.markdown(answer)
+
+    # ── POST A JOB ──
+    elif jobs_section == "Post a Job":
+        st.subheader("📢 Post a Job Opening")
+        st.info("Share a job opportunity with Gambians. Fill in the details below and we will generate a professional job posting.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            job_title = st.text_input("Job title:", placeholder="e.g. Senior Accountant")
+            company = st.text_input("Company/Organization:", placeholder="e.g. Trust Bank Gambia")
+            location = st.text_input("Location:", placeholder="e.g. Banjul, Gambia")
+            salary = st.text_input("Salary (optional):", placeholder="e.g. GMD 15,000/month or Negotiable")
+        with col2:
+            job_type = st.selectbox("Job type:", ["Full-time", "Part-time", "Contract", "Internship", "Volunteer"])
+            deadline = st.text_input("Application deadline:", placeholder="e.g. 30 April 2025")
+            contact = st.text_input("Contact email or phone:", placeholder="e.g. hr@company.gm")
+            experience = st.text_input("Experience required:", placeholder="e.g. 3 years")
+
+        requirements = st.text_area(
+            "Job requirements and description:",
+            placeholder="List the key responsibilities, qualifications, and skills needed..."
+        )
+
+        if st.button("Generate job posting", type="primary"):
+            if job_title and company and requirements:
+                with st.spinner("Generating professional job posting..."):
+                    prompt = f"""Generate a professional job posting for:
+Title: {job_title}
+Company: {company}
+Location: {location}
+Type: {job_type}
+Salary: {salary}
+Deadline: {deadline}
+Contact: {contact}
+Experience: {experience}
+Requirements: {requirements}
+
+Format it as a complete professional job advertisement."""
+                    posting = get_answer(prompt)
+                    st.markdown("### 📄 Your Job Posting:")
+                    st.markdown(posting)
+                    st.download_button(
+                        "Download job posting",
+                        posting,
+                        file_name=f"{job_title.replace(' ', '_')}_job_posting.txt"
+                    )
+            else:
+                st.warning("Please fill in at least job title, company, and requirements.")
+
+    # ── CAREER ADVICE ──
+    elif jobs_section == "Career Advice":
+        st.subheader("🎯 Career Advice for Gambians")
+
+        career_topics = [
+            "What are the highest paying jobs in Gambia?",
+            "How do I get a government job in Gambia?",
+            "What skills are most in demand in Gambia?",
+            "How do I get an NGO job in Gambia?",
+            "What IT certifications help get jobs in Gambia?",
+            "How do I negotiate salary in Gambia?",
+            "How do I find remote work from Gambia?",
+            "What are the best careers for women in Gambia?",
+            "How do I start a career in banking in Gambia?",
+            "What are the best careers for young Gambians?",
+        ]
+
+        col1, col2 = st.columns(2)
+        for i, topic in enumerate(career_topics):
+            with col1 if i % 2 == 0 else col2:
+                if st.button(f"💡 {topic}", key=f"career_{i}"):
+                    with st.spinner("Getting career advice..."):
+                        st.markdown(get_answer(f"As a career advisor for Gambia: {topic}. Give practical, realistic advice."))
+
+        st.divider()
+        custom_career = st.text_area("Ask your own career question:")
+        if st.button("Get career advice", type="primary"):
+            if custom_career:
+                with st.spinner("Advising..."):
+                    st.markdown(get_answer(f"As a career advisor for Gambia: {custom_career}"))
+
+    # ── CV TIPS ──
+    elif jobs_section == "CV Tips":
+        st.subheader("📄 CV & Interview Tips for Gambians")
+
+        cv_section = st.radio("Choose:", ["CV Tips", "Cover Letter", "Interview Prep", "Generate CV"], horizontal=True)
+
+        if cv_section == "CV Tips":
+            st.markdown("""
+### How to write a winning CV in Gambia
+
+**Essential sections:**
+1. **Personal details** — Name, phone, email, location
+2. **Personal statement** — 3-4 sentences about your strengths
+3. **Work experience** — Most recent first, include dates
+4. **Education** — Degrees, certificates, WASSCE results
+5. **Skills** — Technical and soft skills
+6. **References** — At least 2 professional references
+
+**Key tips for Gambian job applications:**
+- Always include your WASSCE grades for entry-level positions
+- Mention any volunteer work — NGOs value this highly
+- Include languages spoken — Mandinka, Wolof, Fula are assets
+- Keep your CV to 2 pages maximum
+- Use a professional email address
+- Always attach a cover letter
+- For government jobs include your National ID number
+            """)
+
+        elif cv_section == "Cover Letter":
+            job_applied = st.text_input("Job you are applying for:")
+            your_experience = st.text_area("Brief description of your experience:")
+            if st.button("Generate cover letter", type="primary"):
+                if job_applied and your_experience:
+                    with st.spinner("Writing cover letter..."):
+                        letter = get_answer(f"""Write a professional cover letter for a Gambian applying for: {job_applied}
+Their experience: {your_experience}
+Make it formal, warm, and suitable for a Gambian employer.""")
+                        st.markdown(letter)
+                        st.download_button(
+                            "Download cover letter",
+                            letter,
+                            file_name="cover_letter.txt"
+                        )
+
+        elif cv_section == "Interview Prep":
+            interview_role = st.text_input("Job role you are interviewing for:")
+            if st.button("Get interview questions", type="primary"):
+                if interview_role:
+                    with st.spinner("Preparing interview questions..."):
+                        prep = get_answer(f"""Give me the top 10 interview questions for a {interview_role} position in Gambia, with suggested answers. Include both general and role-specific questions.""")
+                        st.markdown(prep)
+
+        elif cv_section == "Generate CV":
+            st.info("Fill in your details and we will generate a professional CV for you.")
+            name = st.text_input("Full name:")
+            phone = st.text_input("Phone number:")
+            email_cv = st.text_input("Email address:")
+            address = st.text_input("Address:")
+            statement = st.text_area("Personal statement (2-3 sentences about yourself):")
+            experience_cv = st.text_area("Work experience (list each job, dates, and responsibilities):")
+            education_cv = st.text_area("Education (degrees, certificates, WASSCE results):")
+            skills_cv = st.text_area("Skills (technical and soft skills):")
+            references_cv = st.text_area("References (name, title, phone/email):")
+
+            if st.button("Generate CV", type="primary"):
+                if name and experience_cv and education_cv:
+                    with st.spinner("Generating your CV..."):
+                        cv = get_answer(f"""Generate a professional CV in clean text format for:
+Name: {name}
+Phone: {phone}
+Email: {email_cv}
+Address: {address}
+Personal Statement: {statement}
+Experience: {experience_cv}
+Education: {education_cv}
+Skills: {skills_cv}
+References: {references_cv}
+
+Format it as a complete professional CV suitable for Gambian employers.""")
+                        st.markdown(cv)
+                        st.download_button(
+                            "Download your CV",
+                            cv,
+                            file_name=f"{name.replace(' ', '_')}_CV.txt"
+                        )
+                else:
+                    st.warning("Please fill in at least your name, experience, and education.")
