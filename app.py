@@ -132,8 +132,8 @@ def get_answer(query):
         ])
         chain = prompt | llm | StrOutputParser()
         return chain.invoke({"context": combined_context, "question": query})
-    except:
-        return "Sorry, something went wrong. Please try again."
+    except Exception as e:
+        return f"DEBUG ERROR: {str(e)}"
     
 def get_legal_answer(query):
     try:
@@ -168,14 +168,14 @@ def get_legal_answer(query):
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a Gambian legal expert and constitutional scholar.
-Answer legal questions based on Gambian law.
-Always cite the specific law, act, or constitutional article you are referencing.
-Be precise, clear, and use plain language so ordinary citizens understand.
-Format your answer with:
-1. Direct answer
-2. Legal basis (which law or article)
-3. Practical implications
-If you are not certain, say so clearly."""),
+        Answer legal questions based on Gambian law.
+        Always cite the specific law, act, or constitutional article you are referencing.
+        Be precise, clear, and use plain language so ordinary citizens understand.
+        Format your answer with:
+        1. Direct answer
+        2. Legal basis (which law or article)
+        3. Practical implications
+        If you are not certain, say so clearly."""),
             ("human", "Legal question: {question}\n\nContext from Gambian laws:\n{context}")
         ])
 
@@ -265,8 +265,8 @@ def subnet_calculator(ip, prefix):
             "last_host": str(hosts[-1]) if hosts else "N/A",
             "ip_class": "A" if int(ip.split(".")[0]) < 128 else "B" if int(ip.split(".")[0]) < 192 else "C"
         }
-    except:
-        return None
+    except Exception as e:
+        return f"DEBUG ERROR: {str(e)}"
 
 # ── PAGE CONFIG ──
 st.set_page_config(page_title="GambiaGPT", page_icon="🇬🇲", layout="wide")
