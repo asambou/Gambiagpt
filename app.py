@@ -116,7 +116,7 @@ def get_answer(query):
         combined_context = f"WEB SEARCH RESULTS (use these first for current facts):\n{web_context}\n\nKNOWLEDGE BASE (use for background context):\n{doc_context}"
 
         llm = ChatOpenAI(
-        model="google/gemini-2.0-flash-lite",
+        model="google/gemini-2.5-flash-lite",
         openai_api_key=st.secrets["OPENROUTER_API_KEY"],
         base_url="https://openrouter.ai/api/v1",
         temperature=0.1,
@@ -155,7 +155,7 @@ def get_legal_answer(query):
         combined = f"LEGAL DOCUMENTS:\n{context_with_sources}\n\nWEB RESEARCH:\n{web_context}"
 
         llm = ChatOpenAI(
-        model="google/gemini-2.0-flash-lite",
+        model="google/gemini-2.5-flash-lite",
         openai_api_key=st.secrets["OPENROUTER_API_KEY"],
         base_url="https://openrouter.ai/api/v1",
         temperature=0.1,
